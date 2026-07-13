@@ -8,6 +8,7 @@ if (started) {
 }
 
 const createWindow = () => {
+
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 800,
