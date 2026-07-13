@@ -1,3 +1,4 @@
+import { PanelLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Settings, Paintbrush } from 'lucide-react'
 
@@ -23,17 +24,34 @@ const NAV_ITEMS: NavItem[] = [
 interface SidebarNavProps {
     activeId: string
     onSelect: (id: string) => void
+    collapsed: boolean
+    onToggle: () => void
 }
 
-export function SidebarNav({ activeId, onSelect }: SidebarNavProps) {
+export function SidebarNav({ activeId, onSelect, collapsed, onToggle }: SidebarNavProps) {
     return (
-        <aside className="flex h-full w-[240px] shrink-0 flex-col border-r border-border bg-sidebar">
-            {/* 顶部拖拽区 + 搜索框
-                pt-[52px]: 为红绿灯（高度约20px）留出空间，加上上边距共52px */}
+        <aside
+            className={cn(
+                'relative flex h-full shrink-0 flex-col border-r border-border bg-sidebar transition-all duration-200',
+                collapsed ? 'w-0 overflow-hidden border-r-0' : 'w-[240px]'
+            )}
+        >
+            {/* 顶部拖拽区 + toggle 按钮 + 搜索框 */}
             <div
-                className="px-4 pb-3"
+                className="px-3 pb-3"
                 style={{ paddingTop: '52px', WebkitAppRegion: 'drag' } as React.CSSProperties}
             >
+                {/* toggle 按钮：收起侧边栏 */}
+                <button
+                    onClick={onToggle}
+                    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                    className="absolute right-2 top-[14px] flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    title="收起侧边栏"
+                >
+                    <PanelLeft className="h-4 w-4" />
+                </button>
+
+                {/* 搜索框 */}
                 <div
                     className="flex h-7 items-center gap-2 rounded-md bg-muted px-2.5"
                     style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
