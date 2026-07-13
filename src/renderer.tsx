@@ -27,21 +27,21 @@ const App: React.FC = () => {
 
       {/* 右侧内容区 */}
       <main className="relative flex flex-1 flex-col overflow-hidden bg-background">
-        {/* 收起状态下显示展开按钮，放在红绿灯右侧 */}
+        {/* 收起状态：展开按钮放在红绿灯右侧同行 */}
         {collapsed && (
-          <div
-            className="absolute left-0 top-0 flex items-center"
-            style={{ paddingTop: '14px', paddingLeft: '80px', WebkitAppRegion: 'drag' } as React.CSSProperties}
+          <button
+            onClick={() => setCollapsed(false)}
+            style={{
+              position: 'absolute',
+              left: '88px',
+              top: '8px',
+              WebkitAppRegion: 'no-drag',
+            } as React.CSSProperties}
+            className="z-10 flex h-[28px] w-[28px] items-center justify-center rounded-[6px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            title="展开侧边栏"
           >
-            <button
-              onClick={() => setCollapsed(false)}
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              title="展开侧边栏"
-            >
-              <PanelLeft className="h-4 w-4" />
-            </button>
-          </div>
+            <PanelLeft className="h-[18px] w-[18px]" />
+          </button>
         )}
 
         <div className="flex-1 overflow-y-auto">

@@ -41,14 +41,14 @@ export function SidebarNav({ activeId, onSelect, collapsed, onToggle }: SidebarN
                 className="px-3 pb-3"
                 style={{ paddingTop: '52px', WebkitAppRegion: 'drag' } as React.CSSProperties}
             >
-                {/* toggle 按钮：收起侧边栏 */}
+                {/* toggle 按钮：紧跟红绿灯右侧，垂直居中对齐 */}
                 <button
                     onClick={onToggle}
                     style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-                    className="absolute right-2 top-[14px] flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    className="absolute left-[88px] top-[8px] flex h-[28px] w-[28px] items-center justify-center rounded-[6px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     title="收起侧边栏"
                 >
-                    <PanelLeft className="h-4 w-4" />
+                    <PanelLeft className="h-[18px] w-[18px]" />
                 </button>
 
                 {/* 搜索框 */}
