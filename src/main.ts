@@ -1,13 +1,30 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, nativeImage } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import fs from 'node:fs';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
 
+const setAppIcon = () => {
+  if (process.platform !== 'darwin') return;
+  
+  const appIconPath = MAIN_WINDOW_VITE_DEV_SERVER_URL
+    ? path.join(process.cwd(), 'assets/icon-codex-light.png')
+    : path.join(process.resourcesPath, 'assets/icon-codex-light.icns');
+  
+  if (fs.existsSync(appIconPath)) {
+    app.dock?.setIcon(appIconPath);
+  }
+};
+
 const createWindow = () => {
+  // Determine the icon path
+  const iconPath = MAIN_WINDOW_VITE_DEV_SERVER_URL
+    ? path.join(process.cwd(), 'assets/icon-codex-light.png')
+    : path.join(process.resourcesPath, 'assets/icon-codex-light.png');
 
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -16,6 +33,7 @@ const createWindow = () => {
     minWidth: 700,
     minHeight: 500,
     titleBarStyle: 'hiddenInset',
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
@@ -39,7 +57,10 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+app.whenReady().then(() => {
+  setAppIcon();
+  createWindow();
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
