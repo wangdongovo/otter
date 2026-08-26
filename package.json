@@ -1,7 +1,7 @@
 {
   "name": "otter",
   "productName": "Otter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "跨平台桌面应用",
   "main": ".vite/build/main.js",
   "private": true,
