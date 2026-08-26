@@ -4,10 +4,12 @@ import { PanelLeft } from 'lucide-react'
 import { SidebarNav } from '@/components/sidebar-nav'
 import { PageGeneral } from '@/components/page-general'
 import { PageAppearance } from '@/components/page-appearance'
+import { PageImageCompressor } from '@/components/page-image-compressor'
 import './index.css'
 
 const PAGES: Record<string, React.ReactNode> = {
   general: <PageGeneral />,
+  imageCompressor: <PageImageCompressor />,
   appearance: <PageAppearance />,
 }
 
@@ -44,7 +46,7 @@ const App: React.FC = () => {
           </button>
         )}
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-scroll">
           {PAGES[activeId]}
         </div>
       </main>
