@@ -5,11 +5,13 @@ import { SidebarNav } from '@/components/sidebar-nav'
 import { PageGeneral } from '@/components/page-general'
 import { PageAppearance } from '@/components/page-appearance'
 import { PageImageCompressor } from '@/components/page-image-compressor'
+import { PageGithubImageHost } from '@/components/page-github-image-host'
 import './index.css'
 
 const PAGES: Record<string, React.ReactNode> = {
   general: <PageGeneral />,
   imageCompressor: <PageImageCompressor />,
+  githubImageHost: <PageGithubImageHost />,
   appearance: <PageAppearance />,
 }
 

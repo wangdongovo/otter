@@ -1,4 +1,4 @@
-import { ImageDown, Paintbrush, PanelLeft, Settings } from 'lucide-react'
+import { Cloud, ImageDown, Paintbrush, PanelLeft, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface NavItem {
@@ -17,6 +17,11 @@ const NAV_ITEMS: NavItem[] = [
         id: 'imageCompressor',
         label: '图片压缩',
         icon: <ImageDown className="h-4 w-4" />,
+    },
+    {
+        id: 'githubImageHost',
+        label: 'GitHub 图床',
+        icon: <Cloud className="h-4 w-4" />,
     },
     {
         id: 'appearance',
