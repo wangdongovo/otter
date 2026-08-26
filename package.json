@@ -15,6 +15,10 @@
     "make": "electron-forge make",
     "package:mac-arm64": "electron-forge package --platform=darwin --arch=arm64",
     "make:mac-arm64": "electron-forge make --platform=darwin --arch=arm64",
+    "make:win-x64": "electron-forge make --platform=win32 --arch=x64",
+    "release:patch": "npm version patch && git push --follow-tags",
+    "release:minor": "npm version minor && git push --follow-tags",
+    "release:major": "npm version major && git push --follow-tags",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx ."
   },

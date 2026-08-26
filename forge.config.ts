@@ -9,11 +9,14 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { PublisherGithub } from '@electron-forge/publisher-github';
 
+const electronZipDir = process.env.ELECTRON_ZIP_DIR;
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     icon: 'assets/icon-codex-light',
     extraResource: ['assets'],
+    ...(electronZipDir ? { electronZipDir } : {}),
   },
   rebuildConfig: {},
   makers: [
