@@ -20,10 +20,18 @@
 
 ## 开发
 
+### Node 版本
+
+项目使用 Node.js 24。进入项目后先切换到指定版本：
+
+```bash
+nvm use
+```
+
 ### 安装依赖
 
 ```bash
-npm install
+npm ci
 ```
 
 ### 启动开发环境
@@ -54,26 +62,62 @@ npm run make
 
 # macOS ARM64
 npm run make:mac-arm64
+
+# Windows x64
+npm run make:win-x64
 ```
+
+生成的安装包位于 `out/make/`。
 
 ## 发布到 GitHub Releases
 
-### 前置准备
+项目通过 GitHub Actions 自动发布。推送 `v*` tag 后，会自动构建并发布 GitHub Release。
 
-1. 创建 GitHub Personal Access Token（需 `repo` 权限）
-2. 设置环境变量：
+当前 Release 只发布 Windows/macOS 安装包：
+
+- macOS ARM64：`.dmg`
+- Windows x64：`.exe`
+
+> GitHub Release 页面仍会显示 GitHub 自动生成的 `Source code (zip/tar.gz)`，这是 GitHub 默认行为；项目 workflow 上传的正式安装包只包含 `.dmg` 和 `.exe`。
+
+### 日常开发提交流程
 
 ```bash
-export GITHUB_TOKEN=your_token_here
+git add .
+git commit -m "描述本次改动"
+git push
 ```
 
-### 执行发布
+### 发布新版本
 
 ```bash
-npm run publish
+# 修复、小改动：1.0.0 -> 1.0.1
+npm run release:patch
+
+# 新功能：1.0.0 -> 1.1.0
+npm run release:minor
+
+# 破坏性大版本：1.0.0 -> 2.0.0
+npm run release:major
 ```
 
-发布后会在 GitHub 创建草稿版本，手动确认后正式发布。
+这些命令会自动完成：
+
+1. 更新 `package.json` 和 `package-lock.json` 中的版本号
+2. 创建版本提交
+3. 创建 `vX.Y.Z` Git tag
+4. 执行 `git push --follow-tags`
+5. 触发 GitHub Actions 构建 Windows/macOS 安装包
+6. 自动创建 GitHub Release 并上传 `.dmg` / `.exe`
+
+### 发布前检查
+
+```bash
+npm run lint
+npm run make:mac-arm64
+```
+
+确认本地 macOS 安装包能正常生成后，再执行对应的 `release:*` 命令。
 
 ## 项目结构
 
