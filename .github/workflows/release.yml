@@ -46,10 +46,14 @@ jobs:
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
-          name: installers-${{ matrix.platform }}-${{ matrix.arch }}
+          name: release-assets-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             out/make/**/*.dmg
             out/make/**/*.exe
+            out/make/**/*.zip
+            out/make/**/*.nupkg
+            out/make/**/RELEASES
+            out/make/**/RELEASES.json
           if-no-files-found: error
 
   release:

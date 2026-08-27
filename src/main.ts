@@ -1,7 +1,13 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
+import { app, autoUpdater, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import fs, { promises as fsp } from 'node:fs';
+import {
+  makeUserNotifier,
+  updateElectronApp,
+  UpdateSourceType,
+} from 'update-electron-app';
+import type { AppUpdateState, AppUpdateStatus } from './app-update-types';
 import type {
   CdnProvider,
   GithubImageHostConfig,
@@ -23,6 +29,13 @@ const imageFilters = [
 ];
 const allowedImagePaths = new Set<string>();
 const allowedOutputDirs = new Set<string>();
+const githubReleaseRepo = 'wangdongovo/otter';
+const appUpdateSupportedPlatforms = new Set(['darwin', 'win32']);
+let appUpdateStatus: AppUpdateStatus = {
+  state: 'idle',
+  currentVersion: app.getVersion(),
+  message: '暂未检查更新。',
+};
 
 const defaultGithubImageHostConfig: GithubImageHostConfig = {
   owner: '',
@@ -65,6 +78,47 @@ const readJsonFile = async <T,>(filePath: string, fallback: T): Promise<T> => {
 const writeJsonFile = async (filePath: string, value: unknown) => {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });
   await fsp.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+};
+
+const publishAppUpdateStatus = (
+  state: AppUpdateState,
+  patch: Partial<AppUpdateStatus> = {},
+) => {
+  appUpdateStatus = {
+    ...appUpdateStatus,
+    ...patch,
+    state,
+    currentVersion: app.getVersion(),
+    checkedAt: new Date().toISOString(),
+  };
+
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send('app-updater-status-changed', appUpdateStatus);
+  }
+
+  return appUpdateStatus;
+};
+
+const getUnsupportedUpdateStatus = (): AppUpdateStatus => {
+  if (!app.isPackaged) {
+    return {
+      state: 'unsupported',
+      currentVersion: app.getVersion(),
+      message: '开发环境不会检查更新，请安装正式包后测试。',
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  if (!appUpdateSupportedPlatforms.has(process.platform)) {
+    return {
+      state: 'unsupported',
+      currentVersion: app.getVersion(),
+      message: '当前系统暂不支持自动更新。',
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  return appUpdateStatus;
 };
 
 const normalizeGithubConfig = (
@@ -580,6 +634,91 @@ const registerGithubImageHostHandlers = () => {
   );
 };
 
+const setupAutoUpdater = () => {
+  if (!app.isPackaged || !appUpdateSupportedPlatforms.has(process.platform)) {
+    appUpdateStatus = getUnsupportedUpdateStatus();
+    return;
+  }
+
+  autoUpdater.on('checking-for-update', () => {
+    publishAppUpdateStatus('checking', {
+      message: '正在检查更新...',
+      error: undefined,
+    });
+  });
+
+  autoUpdater.on('update-available', () => {
+    publishAppUpdateStatus('available', {
+      message: '发现新版本，正在后台下载。',
+      error: undefined,
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    publishAppUpdateStatus('not-available', {
+      message: '当前已经是最新版本。',
+      error: undefined,
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (_event, _notes, releaseName) => {
+    publishAppUpdateStatus('downloaded', {
+      message: '新版本已下载，重启后完成安装。',
+      releaseName,
+      error: undefined,
+    });
+  });
+
+  autoUpdater.on('error', (error) => {
+    publishAppUpdateStatus('error', {
+      message: '检查更新失败。',
+      error: error.message,
+    });
+  });
+
+  updateElectronApp({
+    updateSource: {
+      type: UpdateSourceType.ElectronPublicUpdateService,
+      repo: githubReleaseRepo,
+    },
+    updateInterval: '30 minutes',
+    notifyUser: true,
+    onNotifyUser: makeUserNotifier({
+      title: '发现新版本',
+      detail: '新版本已经下载完成，重启应用后生效。',
+      restartButtonText: '立即重启',
+      laterButtonText: '稍后',
+    }),
+  });
+};
+
+const registerAppUpdaterHandlers = () => {
+  ipcMain.handle('app-updater-get-status', async () => getUnsupportedUpdateStatus());
+
+  ipcMain.handle('app-updater-check-for-updates', async () => {
+    const unsupportedStatus = getUnsupportedUpdateStatus();
+
+    if (unsupportedStatus.state === 'unsupported') {
+      appUpdateStatus = unsupportedStatus;
+      return appUpdateStatus;
+    }
+
+    publishAppUpdateStatus('checking', {
+      message: '正在检查更新...',
+      error: undefined,
+    });
+    autoUpdater.checkForUpdates();
+
+    return appUpdateStatus;
+  });
+
+  ipcMain.handle('app-updater-quit-and-install', async () => {
+    if (appUpdateStatus.state === 'downloaded') {
+      autoUpdater.quitAndInstall();
+    }
+  });
+};
+
 const setAppIcon = () => {
   if (process.platform !== 'darwin') return;
   
@@ -632,6 +771,8 @@ const createWindow = () => {
 app.whenReady().then(() => {
   registerImageCompressorHandlers();
   registerGithubImageHostHandlers();
+  registerAppUpdaterHandlers();
+  setupAutoUpdater();
   setAppIcon();
   createWindow();
 });

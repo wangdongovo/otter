@@ -4,6 +4,7 @@ import type {
   GithubClipboardImagePayload,
   GithubImageHostConfig,
 } from './github-image-host-types';
+import type { AppUpdateStatus } from './app-update-types';
 
 contextBridge.exposeInMainWorld('imageCompressor', {
   selectImageFiles: () => ipcRenderer.invoke('select-image-files'),
@@ -40,4 +41,21 @@ contextBridge.exposeInMainWorld('githubImageHost', {
     ipcRenderer.invoke('github-image-host-get-record-preview', id),
   deleteRecord: (id: string) =>
     ipcRenderer.invoke('github-image-host-delete-record', id),
+});
+
+contextBridge.exposeInMainWorld('appUpdater', {
+  getStatus: () => ipcRenderer.invoke('app-updater-get-status'),
+  checkForUpdates: () => ipcRenderer.invoke('app-updater-check-for-updates'),
+  quitAndInstall: () => ipcRenderer.invoke('app-updater-quit-and-install'),
+  onStatusChange: (callback: (status: AppUpdateStatus) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: AppUpdateStatus) => {
+      callback(status);
+    };
+
+    ipcRenderer.on('app-updater-status-changed', listener);
+
+    return () => {
+      ipcRenderer.removeListener('app-updater-status-changed', listener);
+    };
+  },
 });

@@ -69,7 +69,7 @@ const config: ForgeConfig = {
         name: 'otter',
       },
       prerelease: false,
-      draft: true,
+      draft: false,
     }),
   ],
 };

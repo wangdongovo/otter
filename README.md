@@ -73,12 +73,31 @@ npm run make:win-x64
 
 项目通过 GitHub Actions 自动发布。推送 `v*` tag 后，会自动构建并发布 GitHub Release。
 
-当前 Release 只发布 Windows/macOS 安装包：
+Release 会发布 Windows/macOS 安装包：
 
 - macOS ARM64：`.dmg`
 - Windows x64：`.exe`
 
-> GitHub Release 页面仍会显示 GitHub 自动生成的 `Source code (zip/tar.gz)`，这是 GitHub 默认行为；项目 workflow 上传的正式安装包只包含 `.dmg` 和 `.exe`。
+同时，为了支持应用内自动更新，Release 还会包含更新服务必需的文件：
+
+- macOS ARM64：`.zip`
+- Windows x64：`.nupkg`、`RELEASES`
+
+> GitHub Release 页面仍会显示 GitHub 自动生成的 `Source code (zip/tar.gz)`，这是 GitHub 默认行为。用户手动下载时使用 `.dmg` 或 `.exe`；自动更新会读取 `.zip`、`.nupkg` 和 `RELEASES` 等文件。
+
+## 自动更新
+
+项目使用 `update-electron-app` + GitHub Releases 实现自动更新。
+
+应用启动后会自动检查更新，之后每 30 分钟检查一次。也可以在「通用」页面点击检查更新按钮手动检查。发现新版本后会在后台下载，下载完成后提示用户重启安装。
+
+自动更新生效条件：
+
+- GitHub 仓库是公开仓库，或更新文件可被公开访问
+- Release tag 使用合法 SemVer，例如 `v0.0.3`
+- GitHub Release 不能是 draft，也不能是 prerelease
+- macOS 自动更新需要代码签名后的构建
+- Release 中必须包含对应平台的更新文件
 
 ### 日常开发提交流程
 
@@ -108,7 +127,7 @@ npm run release:major
 3. 创建 `vX.Y.Z` Git tag
 4. 执行 `git push --follow-tags`
 5. 触发 GitHub Actions 构建 Windows/macOS 安装包
-6. 自动创建 GitHub Release 并上传 `.dmg` / `.exe`
+6. 自动创建 GitHub Release 并上传安装包和自动更新文件
 
 ### 发布前检查
 
