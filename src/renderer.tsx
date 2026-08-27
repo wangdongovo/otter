@@ -2,56 +2,88 @@ import React, { useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { PanelLeft } from 'lucide-react'
 import { SidebarNav } from '@/components/sidebar-nav'
-import { PageGeneral } from '@/components/page-general'
-import { PageAppearance } from '@/components/page-appearance'
 import { PageImageCompressor } from '@/components/page-image-compressor'
 import { PageGithubImageHost } from '@/components/page-github-image-host'
+import { ProfileSettingsDialog } from '@/components/profile-settings-dialog'
+import { cn } from '@/lib/utils'
 import './index.css'
 
-const PAGES: Record<string, React.ReactNode> = {
-  general: <PageGeneral />,
-  imageCompressor: <PageImageCompressor />,
-  githubImageHost: <PageGithubImageHost />,
-  appearance: <PageAppearance />,
+const PAGE_TITLES: Record<string, string> = {
+  imageCompressor: '图片压缩',
+  githubImageHost: 'GitHub 图床',
 }
 
 const App: React.FC = () => {
-  const [activeId, setActiveId] = useState('general')
+  const [activeId, setActiveId] = useState('imageCompressor')
   const [collapsed, setCollapsed] = useState(false)
+  const [profileSettingsOpen, setProfileSettingsOpen] = useState(false)
+  const [settingsSection, setSettingsSection] = useState<'profile' | 'github'>('profile')
+
+  const openSettings = (section: 'profile' | 'github') => {
+    setSettingsSection(section)
+    setProfileSettingsOpen(true)
+  }
+
+  const pages: Record<string, React.ReactNode> = {
+    imageCompressor: <PageImageCompressor />,
+    githubImageHost: (
+      <PageGithubImageHost onOpenGithubSettings={() => openSettings('github')} />
+    ),
+  }
+
+  if (profileSettingsOpen) {
+    return (
+      <ProfileSettingsDialog
+        open
+        initialSection={settingsSection}
+        onClose={() => setProfileSettingsOpen(false)}
+      />
+    )
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      {/* 侧边栏 */}
       <SidebarNav
         activeId={activeId}
         onSelect={setActiveId}
         collapsed={collapsed}
         onToggle={() => setCollapsed(true)}
+        onProfileClick={() => openSettings('profile')}
       />
 
-      {/* 右侧内容区 */}
       <main className="relative flex flex-1 flex-col overflow-hidden bg-background">
-        {/* 收起状态：展开按钮放在红绿灯右侧同行 */}
-        {collapsed && (
-          <button
-            onClick={() => setCollapsed(false)}
-            style={{
-              position: 'absolute',
-              left: '88px',
-              top: '8px',
-              WebkitAppRegion: 'no-drag',
-            } as React.CSSProperties}
-            className="z-10 flex h-[28px] w-[28px] items-center justify-center rounded-[6px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            title="展开侧边栏"
+        <header className="flex h-[52px] shrink-0 items-center px-3 [-webkit-app-region:drag]">
+          <div
+            className={cn(
+              'flex min-w-0 items-center gap-1 transition-[padding] duration-200',
+              collapsed && 'pl-[72px]'
+            )}
           >
-            <PanelLeft className="h-[18px] w-[18px]" />
-          </button>
-        )}
+            {collapsed && (
+              <button
+                type="button"
+                onClick={() => setCollapsed(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [-webkit-app-region:no-drag]"
+                title="展开侧边栏"
+              >
+                <PanelLeft className="h-[17px] w-[17px]" />
+              </button>
+            )}
+            <button
+              type="button"
+              className="ml-1 flex max-w-[240px] items-center gap-1.5 truncate rounded-lg px-2 py-1.5 text-sm font-medium transition-colors hover:bg-accent [-webkit-app-region:no-drag]"
+            >
+              <span className="truncate">{PAGE_TITLES[activeId]}</span>
+            </button>
+          </div>
 
-        <div className="flex-1 overflow-y-scroll">
-          {PAGES[activeId]}
+        </header>
+
+        <div className="flex-1 overflow-y-auto">
+          {pages[activeId]}
         </div>
       </main>
+
     </div>
   )
 }

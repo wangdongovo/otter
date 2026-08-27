@@ -1,8 +1,8 @@
 import { type ComponentProps, useEffect, useState } from 'react'
 import {
     Check,
-    ClipboardPaste,
     Cloud,
+    CloudUpload,
     Copy,
     GitBranch,
     Image as ImageIcon,
@@ -11,7 +11,6 @@ import {
     Settings,
     Trash2,
     Upload,
-    X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { SelectedImageFile } from '@/image-compressor-types'
@@ -79,11 +78,11 @@ const formatBytes = (bytes: number) => {
 }
 
 const getStatusDotClass = (status: UploadStatus) => {
-    if (status === 'completed') return 'bg-green-400 ring-green-400/25 shadow-[0_0_10px_rgb(74_222_128_/_0.45)]'
-    if (status === 'failed') return 'bg-red-400 ring-red-400/25 shadow-[0_0_10px_rgb(248_113_113_/_0.45)]'
-    if (status === 'uploading') return 'bg-sky-400 ring-sky-400/25 shadow-[0_0_10px_rgb(56_189_248_/_0.45)]'
+    if (status === 'completed') return 'bg-emerald-300 shadow-[0_0_12px_rgb(110_231_183_/_0.95)]'
+    if (status === 'failed') return 'bg-rose-300 shadow-[0_0_12px_rgb(253_164_175_/_0.95)]'
+    if (status === 'uploading') return 'bg-cyan-300 shadow-[0_0_12px_rgb(103_232_249_/_0.95)]'
 
-    return 'bg-zinc-400 ring-zinc-400/20'
+    return 'bg-zinc-300 shadow-[0_0_8px_rgb(212_212_216_/_0.75)]'
 }
 
 const getConnectionDotClass = (
@@ -91,30 +90,34 @@ const getConnectionDotClass = (
     isChecking: boolean,
     isConfigured: boolean,
 ) => {
-    if (!isConfigured) return 'bg-zinc-400 ring-zinc-400/20'
-    if (isChecking) return 'bg-sky-400 ring-sky-400/25 shadow-[0_0_10px_rgb(56_189_248_/_0.45)]'
-    if (!connection) return 'bg-zinc-400 ring-zinc-400/20'
+    if (!isConfigured) return 'bg-zinc-300 shadow-[0_0_8px_rgb(212_212_216_/_0.75)]'
+    if (isChecking) return 'bg-cyan-300 shadow-[0_0_12px_rgb(103_232_249_/_0.95)]'
+    if (!connection) return 'bg-zinc-300 shadow-[0_0_8px_rgb(212_212_216_/_0.75)]'
 
     return connection.ok
-        ? 'bg-green-400 ring-green-400/25 shadow-[0_0_10px_rgb(74_222_128_/_0.45)]'
-        : 'bg-red-400 ring-red-400/25 shadow-[0_0_10px_rgb(248_113_113_/_0.45)]'
+        ? 'bg-emerald-300 shadow-[0_0_12px_rgb(110_231_183_/_0.95)]'
+        : 'bg-rose-300 shadow-[0_0_12px_rgb(253_164_175_/_0.95)]'
 }
 
 function StatusDot({
     className,
-    animated = false,
+    animated = true,
 }: {
     className: string
     animated?: boolean
 }) {
     return (
-        <span
-            className={cn(
-                'h-1.5 w-1.5 rounded-full ring-2',
-                animated && 'animate-pulse',
-                className,
+        <span className="relative flex h-1.5 w-1.5 shrink-0 items-center justify-center">
+            {animated && (
+                <span
+                    className={cn(
+                        'absolute h-1.5 w-1.5 rounded-full opacity-45 animate-ping',
+                        className,
+                    )}
+                />
             )}
-        />
+            <span className={cn('relative h-1.5 w-1.5 rounded-full', className)} />
+        </span>
     )
 }
 
@@ -137,17 +140,18 @@ const applyPublicConfig = (
     customCdnPrefix: config.customCdnPrefix,
 })
 
-export function PageGithubImageHost() {
+interface PageGithubImageHostProps {
+    onOpenGithubSettings: () => void
+}
+
+export function PageGithubImageHost({ onOpenGithubSettings }: PageGithubImageHostProps) {
     const [form, setForm] = useState<GithubImageHostConfig>(defaultForm)
-    const [hasToken, setHasToken] = useState(false)
     const [connection, setConnection] = useState<GithubImageHostConnection | null>(null)
     const [items, setItems] = useState<UploadItem[]>([])
     const [records, setRecords] = useState<GithubImageUploadRecord[]>([])
     const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({})
-    const [isSaving, setIsSaving] = useState(false)
     const [isTesting, setIsTesting] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
-    const [isConfigOpen, setIsConfigOpen] = useState(false)
     const [notice, setNotice] = useState('')
     const [noticeTone, setNoticeTone] = useState<'neutral' | 'success' | 'error'>('neutral')
     const [copiedId, setCopiedId] = useState('')
@@ -180,7 +184,6 @@ export function PageGithubImageHost() {
             ])
 
             setForm(applyPublicConfig(config))
-            setHasToken(config.hasToken)
             setRecords(uploadRecords)
             void runConnectionCheck(applyPublicConfig(config))
         }
@@ -213,43 +216,6 @@ export function PageGithubImageHost() {
             setPreviewUrls({})
         }
     }, [records])
-
-    const updateForm = (patch: Partial<GithubImageHostConfig>) => {
-        setForm((current) => ({ ...current, ...patch }))
-        setNotice('')
-        setNoticeTone('neutral')
-    }
-
-    const handleOpenConfig = async () => {
-        const config = await window.githubImageHost.getConfig()
-
-        setForm(applyPublicConfig(config))
-        setHasToken(config.hasToken)
-        setIsConfigOpen(true)
-    }
-
-    const handleSave = async () => {
-        setIsSaving(true)
-        setNotice('')
-        setNoticeTone('neutral')
-
-        try {
-            const saved = await window.githubImageHost.saveConfig(form)
-            const nextConfig = applyPublicConfig(saved)
-
-            setForm(nextConfig)
-            setHasToken(saved.hasToken)
-            setNotice('GitHub 图床配置已保存。')
-            setNoticeTone('success')
-            setIsConfigOpen(false)
-            void runConnectionCheck(nextConfig)
-        } catch (error) {
-            setNotice(error instanceof Error ? error.message : '配置保存失败。')
-            setNoticeTone('error')
-        } finally {
-            setIsSaving(false)
-        }
-    }
 
     const handleSelectImages = async () => {
         const selected = await window.imageCompressor.selectImageFiles()
@@ -398,7 +364,7 @@ export function PageGithubImageHost() {
                 target instanceof HTMLTextAreaElement ||
                 (target instanceof HTMLElement && target.isContentEditable)
 
-            if (isConfigOpen || isEditableTarget || isUploading) {
+            if (isEditableTarget || isUploading) {
                 return
             }
 
@@ -409,7 +375,7 @@ export function PageGithubImageHost() {
         window.addEventListener('paste', handlePaste)
 
         return () => window.removeEventListener('paste', handlePaste)
-    }, [isConfigOpen, isUploading])
+    }, [isUploading])
 
     const handleCopy = async (id: string, url: string) => {
         await navigator.clipboard.writeText(url)
@@ -429,16 +395,6 @@ export function PageGithubImageHost() {
     const cdnLabel =
         CDN_OPTIONS.find((option) => option.value === form.cdnProvider)?.label ?? 'jsDelivr'
     const isConnectionConfigured = canTestConnection(form)
-    const connectionLabel = !isConnectionConfigured
-        ? '未配置'
-        : isTesting
-            ? '连接中'
-            : connection?.ok
-                ? '已连接'
-                : connection
-                    ? '未连接'
-                    : '待连接'
-
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-8 pb-10 pt-10">
             <div className="flex items-center justify-between gap-4">
@@ -452,19 +408,20 @@ export function PageGithubImageHost() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="flex h-8 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground">
-                        <StatusDot
-                            className={getConnectionDotClass(
-                                connection,
-                                isTesting,
-                                isConnectionConfigured,
-                            )}
-                        />
-                        {connectionLabel}
-                    </div>
-                    <StableButton variant="outline" onClick={handleOpenConfig}>
+                    <StatusDot
+                        className={getConnectionDotClass(
+                            connection,
+                            isTesting,
+                            isConnectionConfigured,
+                        )}
+                    />
+                    <StableButton
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={onOpenGithubSettings}
+                        title="GitHub 配置"
+                    >
                         <Settings className="h-4 w-4" />
-                        GitHub 配置
                     </StableButton>
                 </div>
             </div>
@@ -495,7 +452,7 @@ export function PageGithubImageHost() {
                     <div className="min-w-0">
                         <div className="text-xs text-muted-foreground">Token</div>
                         <div className="truncate text-sm font-medium text-foreground">
-                            {hasToken ? '已保存' : '未配置'}
+                            {form.token ? '已保存' : '未配置'}
                         </div>
                     </div>
                 </div>
@@ -511,27 +468,33 @@ export function PageGithubImageHost() {
                         </span>
                     </div>
 
-                    <div className="flex min-h-32 items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 p-5">
-                        <StableButton
-                            variant="ghost"
-                            size="icon-lg"
-                            onClick={handleSelectImages}
-                            disabled={isUploading}
-                            title="选择图片"
-                            className="size-16 rounded-lg bg-background/70 hover:bg-background"
-                        >
-                            <ImageIcon className="h-8 w-8" />
-                        </StableButton>
-                        <StableButton
-                            variant="ghost"
-                            size="icon-lg"
-                            onClick={() => void handlePasteImage()}
-                            disabled={isUploading}
-                            title="粘贴并上传"
-                            className="size-16 rounded-lg bg-background/70 hover:bg-background"
-                        >
-                            <ClipboardPaste className="h-8 w-8" />
-                        </StableButton>
+                    <div
+                        role="button"
+                        tabIndex={isUploading ? -1 : 0}
+                        onClick={() => {
+                            if (!isUploading) {
+                                void handleSelectImages()
+                            }
+                        }}
+                        onKeyDown={(event) => {
+                            if (isUploading) return
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault()
+                                void handleSelectImages()
+                            }
+                        }}
+                        className={cn(
+                            'group relative flex min-h-56 cursor-pointer items-center justify-center rounded-2xl border border-dashed border-border bg-muted/15 p-8 transition-colors hover:border-foreground/25 hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+                            isUploading && 'pointer-events-none cursor-default opacity-60',
+                        )}
+                        title="选择图片"
+                    >
+                        <div className="relative flex h-28 w-28 items-center justify-center">
+                            <span className="absolute h-20 w-20 rounded-full bg-cyan-300/10 opacity-0 transition-opacity group-hover:opacity-100 group-hover:animate-ping" />
+                            <span className="absolute h-24 w-24 rounded-full border border-border/80 bg-background shadow-sm transition-transform duration-300 group-hover:scale-105" />
+                            <CloudUpload className="relative h-11 w-11 text-muted-foreground transition-colors duration-200 group-hover:text-foreground" />
+                            <span className="absolute bottom-5 h-1.5 w-6 rounded-full bg-cyan-300/80 shadow-[0_0_14px_rgb(103_232_249_/_0.8)] transition-transform duration-300 group-hover:-translate-y-8 group-hover:opacity-0" />
+                        </div>
                     </div>
 
                     {notice && (
@@ -586,7 +549,6 @@ export function PageGithubImageHost() {
                                     <div className="flex items-center justify-center">
                                         <StatusDot
                                             className={getStatusDotClass(item.status)}
-                                            animated={item.status !== 'completed'}
                                         />
                                     </div>
                                     <div className="flex items-center justify-end gap-1">
@@ -682,180 +644,6 @@ export function PageGithubImageHost() {
                     </div>
                 )}
             </section>
-
-            {isConfigOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4 backdrop-blur-sm">
-                    <div className="flex max-h-[86vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-xl">
-                        <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                            <div className="flex items-center gap-2">
-                                <GitBranch className="h-4 w-4 text-muted-foreground" />
-                                <div>
-                                    <h2 className="text-base font-semibold text-foreground">
-                                        GitHub 图床配置
-                                    </h2>
-                                    <p className="text-xs text-muted-foreground">
-                                        配置会保存到本地缓存，下次打开自动回显。
-                                    </p>
-                                </div>
-                            </div>
-                            <StableButton
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => setIsConfigOpen(false)}
-                                title="关闭"
-                            >
-                                <X className="h-4 w-4" />
-                            </StableButton>
-                        </div>
-
-                        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
-                            <div className="grid grid-cols-2 gap-3">
-                                <label className="flex flex-col gap-2 text-sm">
-                                    <span className="text-muted-foreground">Owner</span>
-                                    <input
-                                        value={form.owner}
-                                        onChange={(event) =>
-                                            updateForm({ owner: event.target.value })
-                                        }
-                                        className="h-8 rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                                        placeholder="octocat"
-                                    />
-                                </label>
-                                <label className="flex flex-col gap-2 text-sm">
-                                    <span className="text-muted-foreground">Repo</span>
-                                    <input
-                                        value={form.repo}
-                                        onChange={(event) =>
-                                            updateForm({ repo: event.target.value })
-                                        }
-                                        className="h-8 rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                                        placeholder="image-host"
-                                    />
-                                </label>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <label className="flex flex-col gap-2 text-sm">
-                                    <span className="text-muted-foreground">Branch</span>
-                                    <input
-                                        value={form.branch}
-                                        onChange={(event) =>
-                                            updateForm({ branch: event.target.value })
-                                        }
-                                        className="h-8 rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                                        placeholder="main"
-                                    />
-                                </label>
-                                <label className="flex flex-col gap-2 text-sm">
-                                    <span className="text-muted-foreground">上传目录</span>
-                                    <input
-                                        value={form.directory}
-                                        onChange={(event) =>
-                                            updateForm({ directory: event.target.value })
-                                        }
-                                        className="h-8 rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                                        placeholder="images"
-                                    />
-                                </label>
-                            </div>
-
-                            <label className="flex flex-col gap-2 text-sm">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-muted-foreground">Token</span>
-                                    <span
-                                        className={cn(
-                                            'rounded-full px-2 py-0.5 text-xs',
-                                            hasToken
-                                                ? 'bg-green-500/10 text-green-600'
-                                                : 'bg-muted text-muted-foreground',
-                                        )}
-                                    >
-                                        {hasToken ? '已回显' : '未保存'}
-                                    </span>
-                                </div>
-                                <input
-                                    type="text"
-                                    value={form.token}
-                                    onChange={(event) =>
-                                        updateForm({ token: event.target.value })
-                                    }
-                                    className="h-8 rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                                    placeholder={
-                                        hasToken
-                                            ? '已从本地缓存读取 token'
-                                            : 'GitHub fine-grained token'
-                                    }
-                                />
-                            </label>
-
-                            <label className="flex flex-col gap-2 text-sm">
-                                <span className="text-muted-foreground">CDN 链接前缀</span>
-                                <select
-                                    value={form.cdnProvider}
-                                    onChange={(event) =>
-                                        updateForm({
-                                            cdnProvider: event.target.value as CdnProvider,
-                                        })
-                                    }
-                                    className="h-8 rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                                >
-                                    {CDN_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                                <span className="text-xs text-muted-foreground">
-                                    {
-                                        CDN_OPTIONS.find(
-                                            (option) => option.value === form.cdnProvider,
-                                        )?.description
-                                    }
-                                </span>
-                            </label>
-
-                            {form.cdnProvider === 'custom' && (
-                                <label className="flex flex-col gap-2 text-sm">
-                                    <span className="text-muted-foreground">
-                                        自定义 CDN 前缀
-                                    </span>
-                                    <input
-                                        value={form.customCdnPrefix}
-                                        onChange={(event) =>
-                                            updateForm({ customCdnPrefix: event.target.value })
-                                        }
-                                        className="h-8 rounded-lg border border-input bg-background px-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                                        placeholder="https://cdn.example.com"
-                                    />
-                                </label>
-                            )}
-                        </div>
-
-                        <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-4">
-                            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                                <StatusDot
-                                    className={getConnectionDotClass(
-                                        connection,
-                                        isTesting,
-                                        isConnectionConfigured,
-                                    )}
-                                />
-                                <span className="truncate">{connectionLabel}</span>
-                            </div>
-                            <div className="flex gap-2">
-                                <StableButton onClick={handleSave} disabled={isSaving}>
-                                    {isSaving ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <Check className="h-4 w-4" />
-                                    )}
-                                    保存配置
-                                </StableButton>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
