@@ -17,9 +17,9 @@
     "package:mac-arm64": "npm run clean:out && electron-forge package --platform=darwin --arch=arm64",
     "make:mac-arm64": "npm run clean:out && electron-forge make --platform=darwin --arch=arm64",
     "make:win-x64": "npm run clean:out && electron-forge make --platform=win32 --arch=x64",
-    "release:patch": "npm version patch && git push --follow-tags",
-    "release:minor": "npm version minor && git push --follow-tags",
-    "release:major": "npm version major && git push --follow-tags",
+    "release:patch": "npm version patch && git push origin HEAD && git push origin v$(node -p \"require('./package.json').version\")",
+    "release:minor": "npm version minor && git push origin HEAD && git push origin v$(node -p \"require('./package.json').version\")",
+    "release:major": "npm version major && git push origin HEAD && git push origin v$(node -p \"require('./package.json').version\")",
     "publish": "npm run clean:out && electron-forge publish",
     "lint": "eslint --ext .ts,.tsx ."
   },
