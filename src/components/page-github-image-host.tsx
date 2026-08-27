@@ -1,13 +1,13 @@
 import { type ComponentProps, useEffect, useState } from 'react'
 import {
     Check,
+    ClipboardPaste,
     Cloud,
     Copy,
     GitBranch,
     Image as ImageIcon,
     Link,
     Loader2,
-    RefreshCw,
     Settings,
     Trash2,
     Upload,
@@ -29,6 +29,7 @@ type UploadStatus = 'queued' | 'uploading' | 'completed' | 'failed'
 interface UploadItem extends SelectedImageFile {
     id: string
     status: UploadStatus
+    previewUrl?: string
     url?: string
     error?: string
 }
@@ -85,7 +86,13 @@ const getStatusDotClass = (status: UploadStatus) => {
     return 'bg-zinc-400 ring-zinc-400/20'
 }
 
-const getConnectionDotClass = (connection: GithubImageHostConnection | null) => {
+const getConnectionDotClass = (
+    connection: GithubImageHostConnection | null,
+    isChecking: boolean,
+    isConfigured: boolean,
+) => {
+    if (!isConfigured) return 'bg-zinc-400 ring-zinc-400/20'
+    if (isChecking) return 'bg-sky-400 ring-sky-400/25 shadow-[0_0_10px_rgb(56_189_248_/_0.45)]'
     if (!connection) return 'bg-zinc-400 ring-zinc-400/20'
 
     return connection.ok
@@ -93,24 +100,22 @@ const getConnectionDotClass = (connection: GithubImageHostConnection | null) => 
         : 'bg-red-400 ring-red-400/25 shadow-[0_0_10px_rgb(248_113_113_/_0.45)]'
 }
 
-const getStatusBadgeClass = (status: UploadStatus) => {
-    if (status === 'completed') return 'bg-green-500/10 text-green-600 ring-green-500/20'
-    if (status === 'failed') return 'bg-red-500/10 text-red-600 ring-red-500/20'
-    if (status === 'uploading') return 'bg-sky-500/10 text-sky-600 ring-sky-500/20'
-
-    return 'bg-muted text-muted-foreground ring-border'
-}
-
-const getStatusLabel = (status: UploadStatus) => {
-    if (status === 'queued') return '等待中'
-    if (status === 'uploading') return '上传中'
-    if (status === 'completed') return '已完成'
-
-    return '失败'
-}
-
-function StatusDot({ className }: { className: string }) {
-    return <span className={cn('h-1.5 w-1.5 rounded-full ring-2', className)} />
+function StatusDot({
+    className,
+    animated = false,
+}: {
+    className: string
+    animated?: boolean
+}) {
+    return (
+        <span
+            className={cn(
+                'h-1.5 w-1.5 rounded-full ring-2',
+                animated && 'animate-pulse',
+                className,
+            )}
+        />
+    )
 }
 
 function StableButton({
@@ -147,6 +152,26 @@ export function PageGithubImageHost() {
     const [noticeTone, setNoticeTone] = useState<'neutral' | 'success' | 'error'>('neutral')
     const [copiedId, setCopiedId] = useState('')
 
+    const canTestConnection = (config: GithubImageHostConfig) =>
+        Boolean(config.owner && config.repo && config.branch && config.token)
+
+    const runConnectionCheck = async (config: GithubImageHostConfig) => {
+        if (!canTestConnection(config)) {
+            setConnection(null)
+            return
+        }
+
+        setIsTesting(true)
+
+        try {
+            const result = await window.githubImageHost.testConnection(config)
+
+            setConnection(result)
+        } finally {
+            setIsTesting(false)
+        }
+    }
+
     useEffect(() => {
         const load = async () => {
             const [config, uploadRecords] = await Promise.all([
@@ -157,6 +182,7 @@ export function PageGithubImageHost() {
             setForm(applyPublicConfig(config))
             setHasToken(config.hasToken)
             setRecords(uploadRecords)
+            void runConnectionCheck(applyPublicConfig(config))
         }
 
         void load()
@@ -209,12 +235,14 @@ export function PageGithubImageHost() {
 
         try {
             const saved = await window.githubImageHost.saveConfig(form)
+            const nextConfig = applyPublicConfig(saved)
 
-            setForm(applyPublicConfig(saved))
+            setForm(nextConfig)
             setHasToken(saved.hasToken)
             setNotice('GitHub 图床配置已保存。')
             setNoticeTone('success')
             setIsConfigOpen(false)
+            void runConnectionCheck(nextConfig)
         } catch (error) {
             setNotice(error instanceof Error ? error.message : '配置保存失败。')
             setNoticeTone('error')
@@ -223,30 +251,35 @@ export function PageGithubImageHost() {
         }
     }
 
-    const handleTestConnection = async () => {
-        setIsTesting(true)
-        setNotice('')
-        setNoticeTone('neutral')
-
-        try {
-            const result = await window.githubImageHost.testConnection(form)
-
-            setConnection(result)
-            setNotice(result.message)
-            setNoticeTone(result.ok ? 'success' : 'error')
-        } catch (error) {
-            setNotice(error instanceof Error ? error.message : '连接测试失败。')
-            setNoticeTone('error')
-        } finally {
-            setIsTesting(false)
-        }
-    }
-
     const handleSelectImages = async () => {
         const selected = await window.imageCompressor.selectImageFiles()
 
         if (selected.length === 0) return
 
+        const filesWithPreview = await Promise.all(
+            selected.map(async (file) => {
+                try {
+                    return {
+                        ...file,
+                        previewUrl: await window.imageCompressor.readImageDataUrl(file.path),
+                    }
+                } catch {
+                    return {
+                        ...file,
+                        previewUrl: '',
+                    }
+                }
+            }),
+        )
+
+        addItemsToQueue(filesWithPreview)
+        setNotice('')
+        setNoticeTone('neutral')
+    }
+
+    const addItemsToQueue = (
+        selected: Array<SelectedImageFile & { previewUrl?: string }>,
+    ) => {
         setItems((current) => {
             const existing = new Set(current.map((item) => item.path))
             const nextItems = selected
@@ -255,12 +288,11 @@ export function PageGithubImageHost() {
                     ...file,
                     id: `${file.path}-${file.size}`,
                     status: 'queued' as UploadStatus,
+                    previewUrl: file.previewUrl,
                 }))
 
-            return [...current, ...nextItems]
+            return [...nextItems, ...current]
         })
-        setNotice('')
-        setNoticeTone('neutral')
     }
 
     const updateItem = (id: string, patch: Partial<UploadItem>) => {
@@ -269,43 +301,115 @@ export function PageGithubImageHost() {
         )
     }
 
-    const handleUpload = async () => {
-        if (items.length === 0) {
-            setNotice('请先选择要上传的图片。')
-            setNoticeTone('error')
-            return
-        }
-
+    const handleUploadItem = async (item: UploadItem) => {
         setIsUploading(true)
         setNotice('')
         setNoticeTone('neutral')
 
-        for (const item of items) {
-            if (item.status === 'completed') continue
+        try {
+            updateItem(item.id, { status: 'uploading', error: undefined })
 
-            try {
-                updateItem(item.id, { status: 'uploading', error: undefined })
+            const record = await window.githubImageHost.uploadImage({
+                filePath: item.path,
+                fileName: item.name,
+            })
 
-                const record = await window.githubImageHost.uploadImage({
-                    filePath: item.path,
-                    fileName: item.name,
-                })
-
-                updateItem(item.id, {
-                    status: 'completed',
-                    url: record.cdnUrl,
-                })
-                setRecords((current) => [record, ...current])
-            } catch (error) {
-                updateItem(item.id, {
-                    status: 'failed',
-                    error: error instanceof Error ? error.message : '上传失败',
-                })
-            }
+            updateItem(item.id, {
+                status: 'completed',
+                url: record.cdnUrl,
+            })
+            setRecords((current) => [record, ...current])
+        } catch (error) {
+            updateItem(item.id, {
+                status: 'failed',
+                error: error instanceof Error ? error.message : '上传失败',
+            })
         }
 
         setIsUploading(false)
     }
+
+    const readFileAsDataUrl = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+
+            reader.onload = () => {
+                if (typeof reader.result === 'string') {
+                    resolve(reader.result)
+                } else {
+                    reject(new Error('无法读取粘贴图片。'))
+                }
+            }
+            reader.onerror = () => reject(new Error('无法读取粘贴图片。'))
+            reader.readAsDataURL(file)
+        })
+
+    const createUploadItem = (
+        image: SelectedImageFile,
+        previewUrl?: string,
+    ): UploadItem => ({
+        ...image,
+        id: `${image.path}-${image.size}`,
+        status: 'queued',
+        previewUrl,
+    })
+
+    const handlePasteImage = async (event?: ClipboardEvent) => {
+        const clipboardItems = Array.from(event?.clipboardData?.items ?? [])
+        const imageItem = clipboardItems.find((item) => item.type.startsWith('image/'))
+
+        if (imageItem) {
+            const file = imageItem.getAsFile()
+
+            if (file) {
+                const dataUrl = await readFileAsDataUrl(file)
+                const savedImage = await window.githubImageHost.savePastedImage({
+                    dataUrl,
+                    fileName: file.name || undefined,
+                })
+                const uploadItem = createUploadItem(savedImage, dataUrl)
+
+                addItemsToQueue([uploadItem])
+                await handleUploadItem(uploadItem)
+                return
+            }
+        }
+
+        const pastedImage = await window.githubImageHost.readClipboardImage()
+
+        if (!pastedImage) {
+            setNotice('剪贴板里没有可上传的图片。')
+            setNoticeTone('error')
+            return
+        }
+
+        const dataUrl = await window.imageCompressor.readImageDataUrl(pastedImage.path)
+        const pastedItem = createUploadItem(pastedImage, dataUrl)
+
+        addItemsToQueue([pastedItem])
+        await handleUploadItem(pastedItem)
+    }
+
+    useEffect(() => {
+        const handlePaste = (event: ClipboardEvent) => {
+            const target = event.target
+            const isEditableTarget =
+                target instanceof HTMLInputElement ||
+                target instanceof HTMLTextAreaElement ||
+                (target instanceof HTMLElement && target.isContentEditable)
+
+            if (isConfigOpen || isEditableTarget || isUploading) {
+                return
+            }
+
+            event.preventDefault()
+            void handlePasteImage(event)
+        }
+
+        window.addEventListener('paste', handlePaste)
+
+        return () => window.removeEventListener('paste', handlePaste)
+    }, [isConfigOpen, isUploading])
 
     const handleCopy = async (id: string, url: string) => {
         await navigator.clipboard.writeText(url)
@@ -324,6 +428,16 @@ export function PageGithubImageHost() {
     const pathSummary = `${form.branch || 'main'} / ${form.directory || 'images'}`
     const cdnLabel =
         CDN_OPTIONS.find((option) => option.value === form.cdnProvider)?.label ?? 'jsDelivr'
+    const isConnectionConfigured = canTestConnection(form)
+    const connectionLabel = !isConnectionConfigured
+        ? '未配置'
+        : isTesting
+            ? '连接中'
+            : connection?.ok
+                ? '已连接'
+                : connection
+                    ? '未连接'
+                    : '待连接'
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-8 pb-10 pt-10">
@@ -334,15 +448,19 @@ export function PageGithubImageHost() {
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-foreground">GitHub 图床</h1>
-                        <p className="text-sm text-muted-foreground">
-                            上传图片到指定 GitHub 仓库目录，并生成 CDN 访问链接。
-                        </p>
+                        <p className="text-sm text-muted-foreground">上传图片，生成 CDN 链接。</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-                        <StatusDot className={getConnectionDotClass(connection)} />
-                        {connection ? connection.message : '尚未测试连接'}
+                    <div className="flex h-8 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground">
+                        <StatusDot
+                            className={getConnectionDotClass(
+                                connection,
+                                isTesting,
+                                isConnectionConfigured,
+                            )}
+                        />
+                        {connectionLabel}
                     </div>
                     <StableButton variant="outline" onClick={handleOpenConfig}>
                         <Settings className="h-4 w-4" />
@@ -352,7 +470,7 @@ export function PageGithubImageHost() {
             </div>
 
             <section className="flex flex-col gap-4">
-                <div className="grid gap-3 rounded-lg border border-border bg-card p-4 md:grid-cols-4">
+                <div className="grid gap-3 rounded-lg border border-border bg-card p-3 md:grid-cols-4">
                     <div className="flex items-center gap-2">
                         <GitBranch className="h-4 w-4 text-muted-foreground" />
                         <div className="min-w-0">
@@ -393,29 +511,27 @@ export function PageGithubImageHost() {
                         </span>
                     </div>
 
-                    <div className="flex min-h-36 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 p-5">
-                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                        <div className="text-center text-sm text-muted-foreground">
-                            选择图片后上传到 GitHub 配置目录。
-                        </div>
-                        <div className="flex gap-2">
-                            <StableButton onClick={handleSelectImages} disabled={isUploading}>
-                                <Upload className="h-4 w-4" />
-                                选择图片
-                            </StableButton>
-                            <StableButton
-                                variant="outline"
-                                onClick={handleUpload}
-                                disabled={isUploading || items.length === 0}
-                            >
-                                {isUploading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Cloud className="h-4 w-4" />
-                                )}
-                                开始上传
-                            </StableButton>
-                        </div>
+                    <div className="flex min-h-32 items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 p-5">
+                        <StableButton
+                            variant="ghost"
+                            size="icon-lg"
+                            onClick={handleSelectImages}
+                            disabled={isUploading}
+                            title="选择图片"
+                            className="size-16 rounded-lg bg-background/70 hover:bg-background"
+                        >
+                            <ImageIcon className="h-8 w-8" />
+                        </StableButton>
+                        <StableButton
+                            variant="ghost"
+                            size="icon-lg"
+                            onClick={() => void handlePasteImage()}
+                            disabled={isUploading}
+                            title="粘贴并上传"
+                            className="size-16 rounded-lg bg-background/70 hover:bg-background"
+                        >
+                            <ClipboardPaste className="h-8 w-8" />
+                        </StableButton>
                     </div>
 
                     {notice && (
@@ -440,32 +556,53 @@ export function PageGithubImageHost() {
                             items.map((item) => (
                                 <div
                                     key={item.id}
-                                    className="grid gap-3 rounded-lg border border-border p-3 md:grid-cols-[minmax(0,1fr)_120px_80px]"
+                                    className="grid gap-3 rounded-lg border border-border p-3 md:grid-cols-[minmax(0,1fr)_32px_88px]"
                                 >
-                                    <div className="min-w-0">
-                                        <div className="truncate text-sm font-medium text-foreground">
-                                            {item.name}
-                                        </div>
-                                        <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
-                                            <span>{formatBytes(item.size)}</span>
-                                            {item.url && <span className="truncate">{item.url}</span>}
-                                            {item.error && (
-                                                <span className="text-destructive">{item.error}</span>
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+                                            {item.previewUrl ? (
+                                                <img
+                                                    src={item.previewUrl}
+                                                    alt={item.name}
+                                                    className="h-full w-full object-cover"
+                                                />
+                                            ) : (
+                                                <ImageIcon className="h-5 w-5 text-muted-foreground" />
                                             )}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="truncate text-sm font-medium text-foreground">
+                                                {item.name}
+                                            </div>
+                                            <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+                                                <span>{formatBytes(item.size)}</span>
+                                                {item.url && <span className="truncate">{item.url}</span>}
+                                                {item.error && (
+                                                    <span className="text-destructive">{item.error}</span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center">
-                                        <span
-                                            className={cn(
-                                                'inline-flex h-6 items-center gap-2 rounded-full px-2 text-xs font-medium ring-1',
-                                                getStatusBadgeClass(item.status),
-                                            )}
+                                    <div className="flex items-center justify-center">
+                                        <StatusDot
+                                            className={getStatusDotClass(item.status)}
+                                            animated={item.status !== 'completed'}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-end gap-1">
+                                        <StableButton
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            onClick={() => handleUploadItem(item)}
+                                            disabled={isUploading || item.status === 'completed'}
+                                            title="上传"
                                         >
-                                            <StatusDot className={getStatusDotClass(item.status)} />
-                                            {getStatusLabel(item.status)}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-end">
+                                            {item.status === 'uploading' ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Cloud className="h-4 w-4" />
+                                            )}
+                                        </StableButton>
                                         <StableButton
                                             variant="ghost"
                                             size="icon-sm"
@@ -503,50 +640,42 @@ export function PageGithubImageHost() {
                         还没有上传成功的图片。
                     </div>
                 ) : (
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="columns-2 gap-3 md:columns-3 xl:columns-4">
                         {records.map((record) => (
                             <div
                                 key={record.id}
-                                className="flex min-h-72 flex-col overflow-hidden rounded-lg border border-border bg-card"
+                                className="group relative mb-3 break-inside-avoid overflow-hidden rounded-lg border border-border bg-muted"
                             >
-                                <div className="flex h-36 items-center justify-center bg-muted">
-                                    <img
-                                        src={previewUrls[record.id] ?? record.cdnUrl}
-                                        alt={record.originalName}
-                                        className="max-h-full max-w-full object-contain"
-                                        loading="lazy"
-                                    />
-                                </div>
-                                <div className="flex flex-1 flex-col gap-3 p-3">
-                                    <div className="min-w-0">
-                                        <div className="truncate text-sm font-medium text-foreground">
-                                            {record.originalName}
-                                        </div>
-                                        <div className="mt-1 text-xs text-muted-foreground">
-                                            {record.cdnProvider} · {formatBytes(record.size)}
-                                        </div>
-                                    </div>
-                                    <div className="rounded-lg bg-muted px-2 py-1.5 text-xs text-muted-foreground">
-                                        <div className="truncate">{record.cdnUrl}</div>
-                                    </div>
-                                    <div className="mt-auto flex gap-2">
-                                        <StableButton
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleCopy(record.id, record.cdnUrl)}
-                                        >
+                                <img
+                                    src={previewUrls[record.id] ?? record.cdnUrl}
+                                    alt={record.originalName}
+                                    className="block h-auto w-full object-cover"
+                                    loading="lazy"
+                                />
+                                <div className="pointer-events-none absolute inset-0 bg-foreground/0 transition-colors group-hover:bg-foreground/10" />
+                                <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                    <StableButton
+                                        variant="secondary"
+                                        size="icon-sm"
+                                        onClick={() => handleCopy(record.id, record.cdnUrl)}
+                                        title="复制链接"
+                                        className="bg-background/90 shadow-sm hover:bg-background"
+                                    >
+                                        {copiedId === record.id ? (
+                                            <Check className="h-4 w-4" />
+                                        ) : (
                                             <Copy className="h-4 w-4" />
-                                            {copiedId === record.id ? '已复制' : '复制链接'}
-                                        </StableButton>
-                                        <StableButton
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            onClick={() => handleDeleteRecord(record.id)}
-                                            title="删除本地记录"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </StableButton>
-                                    </div>
+                                        )}
+                                    </StableButton>
+                                    <StableButton
+                                        variant="secondary"
+                                        size="icon-sm"
+                                        onClick={() => handleDeleteRecord(record.id)}
+                                        title="删除本地记录"
+                                        className="bg-background/90 shadow-sm hover:bg-background"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </StableButton>
                                 </div>
                             </div>
                         ))}
@@ -704,24 +833,16 @@ export function PageGithubImageHost() {
 
                         <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-4">
                             <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                                <StatusDot className={getConnectionDotClass(connection)} />
-                                <span className="truncate">
-                                    {connection ? connection.message : '保存后可测试连接状态'}
-                                </span>
+                                <StatusDot
+                                    className={getConnectionDotClass(
+                                        connection,
+                                        isTesting,
+                                        isConnectionConfigured,
+                                    )}
+                                />
+                                <span className="truncate">{connectionLabel}</span>
                             </div>
                             <div className="flex gap-2">
-                                <StableButton
-                                    variant="outline"
-                                    onClick={handleTestConnection}
-                                    disabled={isTesting}
-                                >
-                                    {isTesting ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <RefreshCw className="h-4 w-4" />
-                                    )}
-                                    测试连接
-                                </StableButton>
                                 <StableButton onClick={handleSave} disabled={isSaving}>
                                     {isSaving ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />

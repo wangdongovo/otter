@@ -1,3 +1,5 @@
+import type { SelectedImageFile } from './image-compressor-types';
+
 export type CdnProvider = 'raw' | 'jsdelivr' | 'statically' | 'custom';
 
 export interface GithubImageHostConfig {
@@ -38,6 +40,11 @@ export interface GithubImageUploadPayload {
   fileName?: string;
 }
 
+export interface GithubClipboardImagePayload {
+  dataUrl: string;
+  fileName?: string;
+}
+
 export interface GithubImageHostApi {
   getConfig: () => Promise<GithubImageHostPublicConfig>;
   saveConfig: (
@@ -47,6 +54,10 @@ export interface GithubImageHostApi {
     config?: GithubImageHostConfig,
   ) => Promise<GithubImageHostConnection>;
   listRecords: () => Promise<GithubImageUploadRecord[]>;
+  readClipboardImage: () => Promise<SelectedImageFile | null>;
+  savePastedImage: (
+    payload: GithubClipboardImagePayload,
+  ) => Promise<SelectedImageFile>;
   uploadImage: (
     payload: GithubImageUploadPayload,
   ) => Promise<GithubImageUploadRecord>;

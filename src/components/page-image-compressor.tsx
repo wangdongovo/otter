@@ -1,5 +1,6 @@
-import { type ComponentProps, useMemo, useState } from 'react'
+import { type ComponentProps, useEffect, useMemo, useState } from 'react'
 import {
+    ClipboardPaste,
     FileImage,
     FolderOpen,
     ImageDown,
@@ -22,6 +23,7 @@ interface QueueImage extends SelectedImageFile {
     id: string
     status: CompressStatus
     progress: number
+    previewUrl?: string
     outputName?: string
     outputPath?: string
     outputSize?: number
@@ -191,6 +193,21 @@ const getStatusText = (item: QueueImage) => {
     return `${STATUS_LABELS[item.status]} ${item.progress}%`
 }
 
+const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+
+        reader.onload = () => {
+            if (typeof reader.result === 'string') {
+                resolve(reader.result)
+            } else {
+                reject(new Error('无法读取粘贴图片。'))
+            }
+        }
+        reader.onerror = () => reject(new Error('无法读取粘贴图片。'))
+        reader.readAsDataURL(file)
+    })
+
 export function PageImageCompressor() {
     const [items, setItems] = useState<QueueImage[]>([])
     const [outputDir, setOutputDir] = useState('')
@@ -227,12 +244,9 @@ export function PageImageCompressor() {
         )
     }
 
-    const handleSelectImages = async () => {
-        const selected = await window.imageCompressor.selectImageFiles()
-
-        if (selected.length === 0) return
-
-        setNotice('')
+    const addImagesToQueue = (
+        selected: Array<SelectedImageFile & { previewUrl?: string }>,
+    ) => {
         setItems((current) => {
             const existingPaths = new Set(current.map((item) => item.path))
             const nextItems = selected
@@ -242,11 +256,102 @@ export function PageImageCompressor() {
                     id: `${file.path}-${file.size}`,
                     status: 'queued' as CompressStatus,
                     progress: 0,
+                    previewUrl: file.previewUrl,
                 }))
 
-            return [...current, ...nextItems]
+            return [...nextItems, ...current]
         })
     }
+
+    const handleSelectImages = async () => {
+        const selected = await window.imageCompressor.selectImageFiles()
+
+        if (selected.length === 0) return
+
+        const filesWithPreview = await Promise.all(
+            selected.map(async (file) => {
+                try {
+                    return {
+                        ...file,
+                        previewUrl: await window.imageCompressor.readImageDataUrl(file.path),
+                    }
+                } catch {
+                    return {
+                        ...file,
+                        previewUrl: '',
+                    }
+                }
+            }),
+        )
+
+        setNotice('')
+        addImagesToQueue(filesWithPreview)
+    }
+
+    const handlePasteImage = async (event?: ClipboardEvent) => {
+        const clipboardItems = Array.from(event?.clipboardData?.items ?? [])
+        const imageItem = clipboardItems.find((item) => item.type.startsWith('image/'))
+
+        if (!imageItem) {
+            const clipboardImage = await window.imageCompressor.readClipboardImage()
+
+            if (!clipboardImage) {
+                setNotice('剪贴板里没有可压缩的图片。')
+                return
+            }
+
+            addImagesToQueue([
+                {
+                    ...clipboardImage,
+                    previewUrl: await window.imageCompressor.readImageDataUrl(clipboardImage.path),
+                },
+            ])
+            setNotice('')
+            return
+        }
+
+        const file = imageItem.getAsFile()
+
+        if (!file) {
+            setNotice('无法读取剪贴板图片。')
+            return
+        }
+
+        const dataUrl = await readFileAsDataUrl(file)
+        const savedImage = await window.imageCompressor.savePastedImage({
+            dataUrl,
+            fileName: file.name || undefined,
+        })
+
+        addImagesToQueue([
+            {
+                ...savedImage,
+                previewUrl: dataUrl,
+            },
+        ])
+        setNotice('')
+    }
+
+    useEffect(() => {
+        const handlePaste = (event: ClipboardEvent) => {
+            const target = event.target
+            const isEditableTarget =
+                target instanceof HTMLInputElement ||
+                target instanceof HTMLTextAreaElement ||
+                (target instanceof HTMLElement && target.isContentEditable)
+
+            if (isProcessing || isEditableTarget) {
+                return
+            }
+
+            event.preventDefault()
+            void handlePasteImage(event)
+        }
+
+        window.addEventListener('paste', handlePaste)
+
+        return () => window.removeEventListener('paste', handlePaste)
+    }, [isProcessing])
 
     const handleSelectOutputFolder = async () => {
         const selectedDir = await window.imageCompressor.selectOutputFolder()
@@ -391,6 +496,15 @@ export function PageImageCompressor() {
                         </StableButton>
                         <StableButton
                             variant="outline"
+                            onClick={() => void handlePasteImage()}
+                            disabled={isProcessing}
+                            title="粘贴图片"
+                        >
+                            <ClipboardPaste className="h-4 w-4" />
+                            粘贴
+                        </StableButton>
+                        <StableButton
+                            variant="outline"
                             onClick={() => setItems([])}
                             disabled={isProcessing || items.length === 0}
                         >
@@ -531,18 +645,28 @@ export function PageImageCompressor() {
                             key={item.id}
                             className="grid min-h-24 gap-3 rounded-lg border border-border bg-card p-4 md:grid-cols-[minmax(0,1fr)_130px_120px_76px]"
                         >
-                            <div className="min-w-0">
-                                <div className="flex min-w-0 items-center gap-2">
-                                    <FileImage className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                    <span className="truncate text-sm font-medium text-foreground">
-                                        {item.name}
-                                    </span>
+                            <div className="flex min-w-0 items-center gap-3">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+                                    {item.previewUrl ? (
+                                        <img
+                                            src={item.previewUrl}
+                                            alt={item.name}
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        <FileImage className="h-5 w-5 text-muted-foreground" />
+                                    )}
                                 </div>
-                                <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                    <span>{formatBytes(item.size)}</span>
-                                    {item.outputName && <span>{item.outputName}</span>}
-                                    {item.outputPath && <span className="truncate">{item.outputPath}</span>}
-                                    {item.error && <span className="text-destructive">{item.error}</span>}
+                                <div className="min-w-0">
+                                    <div className="truncate text-sm font-medium text-foreground">
+                                            {item.name}
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                        <span>{formatBytes(item.size)}</span>
+                                        {item.outputName && <span>{item.outputName}</span>}
+                                        {item.outputPath && <span className="truncate">{item.outputPath}</span>}
+                                        {item.error && <span className="text-destructive">{item.error}</span>}
+                                    </div>
                                 </div>
                             </div>
 

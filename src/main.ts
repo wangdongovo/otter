@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import fs, { promises as fsp } from 'node:fs';
@@ -48,6 +48,9 @@ const getGithubImageHostConfigPath = () =>
 
 const getGithubImageHostRecordsPath = () =>
   path.join(app.getPath('userData'), 'github-image-host-records.json');
+
+const getClipboardImageDir = () =>
+  path.join(app.getPath('userData'), 'clipboard-images');
 
 const readJsonFile = async <T,>(filePath: string, fallback: T): Promise<T> => {
   try {
@@ -203,6 +206,47 @@ const createRepoPath = (config: GithubImageHostConfig, fileName: string) => {
   return [config.directory, uniqueName].filter(Boolean).join('/');
 };
 
+const createTimestamp = () =>
+  new Date()
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\..+$/, '')
+    .replace('T', '-');
+
+const getImageExtensionFromMimeType = (mimeType: string) => {
+  if (mimeType === 'image/jpeg') return 'jpg';
+  if (mimeType === 'image/webp') return 'webp';
+  if (mimeType === 'image/gif') return 'gif';
+  if (mimeType === 'image/bmp') return 'bmp';
+
+  return 'png';
+};
+
+const saveClipboardImageBuffer = async (
+  buffer: Buffer,
+  extension = 'png',
+  fileName?: string,
+) => {
+  const imageDir = getClipboardImageDir();
+  const safeName = fileName ? sanitizeFileName(fileName) : '';
+  const parsed = safeName ? path.parse(safeName) : null;
+  const outputName =
+    parsed?.name && parsed.ext
+      ? `${parsed.name}-${createTimestamp()}${parsed.ext}`
+      : `clipboard-${createTimestamp()}.${extension}`;
+  const filePath = path.join(imageDir, outputName);
+
+  await fsp.mkdir(imageDir, { recursive: true });
+  await fsp.writeFile(filePath, buffer);
+  allowedImagePaths.add(filePath);
+
+  return {
+    path: filePath,
+    name: outputName,
+    size: buffer.byteLength,
+  };
+};
+
 const registerImageCompressorHandlers = () => {
   ipcMain.handle('select-image-files', async () => {
     const result = await dialog.showOpenDialog({
@@ -267,6 +311,41 @@ const registerImageCompressorHandlers = () => {
 
     return `data:${mimeType};base64,${data.toString('base64')}`;
   });
+
+  ipcMain.handle('read-clipboard-image', async () => {
+    const image = clipboard.readImage();
+
+    if (image.isEmpty()) {
+      return null;
+    }
+
+    return await saveClipboardImageBuffer(image.toPNG(), 'png');
+  });
+
+  ipcMain.handle(
+    'save-pasted-image',
+    async (
+      _event,
+      payload: {
+        dataUrl: string;
+        fileName?: string;
+      },
+    ) => {
+      const match = payload.dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+
+      if (!match) {
+        throw new Error('剪贴板图片数据无效。');
+      }
+
+      const [, mimeType, base64] = match;
+
+      return await saveClipboardImageBuffer(
+        Buffer.from(base64, 'base64'),
+        getImageExtensionFromMimeType(mimeType),
+        payload.fileName,
+      );
+    },
+  );
 
   ipcMain.handle(
     'save-compressed-image',
@@ -358,6 +437,41 @@ const registerGithubImageHostHandlers = () => {
   ipcMain.handle('github-image-host-list-records', async () => {
     return await readGithubImageUploadRecords();
   });
+
+  ipcMain.handle('github-image-host-read-clipboard-image', async () => {
+    const image = clipboard.readImage();
+
+    if (image.isEmpty()) {
+      return null;
+    }
+
+    return await saveClipboardImageBuffer(image.toPNG(), 'png');
+  });
+
+  ipcMain.handle(
+    'github-image-host-save-pasted-image',
+    async (
+      _event,
+      payload: {
+        dataUrl: string;
+        fileName?: string;
+      },
+    ) => {
+      const match = payload.dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+
+      if (!match) {
+        throw new Error('剪贴板图片数据无效。');
+      }
+
+      const [, mimeType, base64] = match;
+
+      return await saveClipboardImageBuffer(
+        Buffer.from(base64, 'base64'),
+        getImageExtensionFromMimeType(mimeType),
+        payload.fileName,
+      );
+    },
+  );
 
   ipcMain.handle('github-image-host-get-record-preview', async (_event, id: string) => {
     const records = await readGithubImageUploadRecords();
