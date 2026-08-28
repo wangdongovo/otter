@@ -26,15 +26,15 @@ export function SettingsItem({
         <button
             onClick={onClick}
             className={cn(
-                'group flex w-full items-center gap-3 bg-card px-4 py-3 text-left transition-colors hover:bg-accent',
-                first && 'rounded-t-xl',
-                last && 'rounded-b-xl',
+                'group flex w-full items-center gap-3 bg-card px-3.5 py-3 text-left transition-colors hover:bg-accent',
+                first && 'rounded-t-lg',
+                last && 'rounded-b-lg',
                 !first && 'border-t border-border',
                 className
             )}
         >
             {icon && (
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                     {icon}
                 </span>
             )}
@@ -56,7 +56,7 @@ interface SettingsGroupProps {
 
 export function SettingsGroup({ children, className }: SettingsGroupProps) {
     return (
-        <div className={cn('overflow-hidden rounded-xl border border-border', className)}>
+        <div className={cn('overflow-hidden rounded-lg border border-border', className)}>
             {children}
         </div>
     )

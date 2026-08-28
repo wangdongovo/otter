@@ -3,20 +3,24 @@ import {
     ArrowLeft,
     Check,
     CheckCircle2,
-    Cloud,
+    ChevronDown,
     Code2,
+    Database,
     Download,
-    Gauge,
+    GitBranch,
     Globe2,
     FolderGit2,
     KeyRound,
     Loader2,
-    Palette,
     Search,
-    Settings,
     Save,
-    UserCircle,
+    SlidersHorizontal,
+    SunMoon,
+    UserRound,
 } from 'lucide-react'
+import { PageAppearance } from '@/components/page-appearance'
+import { PageGeneral } from '@/components/page-general'
+import { StatusDot, type StatusDotTone } from '@/components/status-dot'
 import type {
     CdnProvider,
     GithubImageHostConfig,
@@ -25,7 +29,7 @@ import type {
 } from '@/github-image-host-types'
 import { cn } from '@/lib/utils'
 
-type SettingsSection = 'profile' | 'github'
+type SettingsSection = 'general' | 'profile' | 'appearance' | 'github'
 
 interface ProfileSettingsDialogProps {
     open: boolean
@@ -77,15 +81,15 @@ const CDN_OPTIONS: Array<{
 ]
 
 const personalSettings: SettingsNavItem[] = [
-    { id: 'general', label: '常规', icon: <Settings className="h-4 w-4" /> },
+    { id: 'general', label: '常规', icon: <SlidersHorizontal className="h-4 w-4" /> },
     { id: 'import', label: '导入', icon: <Download className="h-4 w-4" /> },
-    { id: 'profile', label: '个人资料', icon: <UserCircle className="h-4 w-4" /> },
-    { id: 'appearance', label: '外观', icon: <Palette className="h-4 w-4" /> },
-    { id: 'usage', label: '使用情况', icon: <Gauge className="h-4 w-4" /> },
+    { id: 'profile', label: '个人资料', icon: <UserRound className="h-4 w-4" /> },
+    { id: 'appearance', label: '外观', icon: <SunMoon className="h-4 w-4" /> },
+    { id: 'usage', label: '使用情况', icon: <Database className="h-4 w-4" /> },
 ]
 
 const integrationSettings: SettingsNavItem[] = [
-    { id: 'github', label: 'GitHub 图床', icon: <Cloud className="h-4 w-4" /> },
+    { id: 'github', label: 'GitHub 图床', icon: <GitBranch className="h-4 w-4" /> },
     { id: 'cdn', label: 'CDN', icon: <Globe2 className="h-4 w-4" /> },
 ]
 
@@ -147,44 +151,36 @@ function getConnectionLabel(
     return '待连接'
 }
 
-function getConnectionDotClass(
+function getConnectionDotTone(
     config: GithubImageHostConfig,
     connection: GithubImageHostConnection | null,
     isTesting: boolean,
-) {
-    if (!canTestConnection(config)) return 'bg-zinc-300 shadow-[0_0_8px_rgb(212_212_216_/_0.75)]'
-    if (isTesting) return 'bg-cyan-300 shadow-[0_0_12px_rgb(103_232_249_/_0.95)]'
+): StatusDotTone {
+    if (!canTestConnection(config)) return 'neutral'
+    if (isTesting) return 'info'
 
-    return connection?.ok
-        ? 'bg-emerald-300 shadow-[0_0_12px_rgb(110_231_183_/_0.95)]'
-        : 'bg-rose-300 shadow-[0_0_12px_rgb(253_164_175_/_0.95)]'
+    return connection?.ok ? 'success' : 'danger'
 }
 
-function StatusDot({ className }: { className: string }) {
-    return (
-        <span className="relative flex h-1.5 w-1.5 shrink-0 items-center justify-center">
-            <span
-                className={cn(
-                    'absolute h-1.5 w-1.5 rounded-full opacity-45 animate-ping',
-                    className,
-                )}
-            />
-            <span className={cn('relative h-1.5 w-1.5 rounded-full', className)} />
-        </span>
-    )
-}
+const formControlClassName =
+    'h-9 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground transition-colors focus-visible:border-ring/60 focus-visible:ring-1 focus-visible:ring-ring/25'
 
-function Field({
+function FormField({
     label,
+    description,
     children,
 }: {
     label: string
+    description?: string
     children: React.ReactNode
 }) {
     return (
-        <label className="grid grid-cols-[160px_minmax(0,1fr)] items-center gap-6 border-b border-border px-6 py-4 last:border-b-0">
-            <span className="text-sm font-medium text-foreground">{label}</span>
+        <label className="flex min-w-0 flex-col gap-2">
+            <span className="text-sm font-medium leading-none text-foreground">{label}</span>
             {children}
+            {description && (
+                <span className="text-xs leading-5 text-muted-foreground">{description}</span>
+            )}
         </label>
     )
 }
@@ -289,8 +285,8 @@ export function ProfileSettingsDialog({
 
     return (
         <div className="flex h-screen overflow-hidden bg-background text-foreground">
-            <aside className="flex w-[292px] shrink-0 flex-col border-r border-border bg-sidebar px-2 pb-3 text-sidebar-foreground">
-                <div className="h-[64px] shrink-0 [-webkit-app-region:drag]" />
+            <aside className="flex w-[272px] shrink-0 flex-col border-r border-border bg-sidebar px-2 pb-3 text-sidebar-foreground">
+                <div className="h-[56px] shrink-0 [-webkit-app-region:drag]" />
 
                 <button
                     type="button"
@@ -301,7 +297,7 @@ export function ProfileSettingsDialog({
                     <span>返回应用</span>
                 </button>
 
-                <div className="mb-5 flex h-10 items-center gap-2 rounded-full border border-border bg-background px-3 text-muted-foreground">
+                <div className="mb-5 flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-muted-foreground">
                     <Search className="h-4 w-4" />
                     <span className="text-sm">搜索设置...</span>
                 </div>
@@ -317,8 +313,16 @@ export function ProfileSettingsDialog({
                                     key={item.id}
                                     type="button"
                                     onClick={() => {
+                                        if (item.id === 'general') {
+                                            setActiveSection('general')
+                                        }
+
                                         if (item.id === 'profile') {
                                             setActiveSection('profile')
+                                        }
+
+                                        if (item.id === 'appearance') {
+                                            setActiveSection('appearance')
                                         }
                                     }}
                                     className={cn(
@@ -384,21 +388,26 @@ export function ProfileSettingsDialog({
             </aside>
 
             <main className="min-w-0 flex-1 overflow-y-auto">
-                <div className="mx-auto w-full max-w-[980px] px-8 pb-16 pt-24">
-                    {activeSection === 'profile' ? (
+                {activeSection === 'appearance' ? (
+                    <PageAppearance />
+                ) : activeSection === 'general' ? (
+                    <PageGeneral />
+                ) : (
+                    <div className="mx-auto w-full max-w-[840px] px-8 pb-12 pt-14">
+                        {activeSection === 'profile' ? (
                         <>
-                            <h1 className="mb-16 text-3xl font-semibold tracking-normal text-foreground">
+                            <h1 className="mb-10 text-2xl font-semibold tracking-normal text-foreground">
                                 个人资料
                             </h1>
 
-                            <section className="mb-12">
-                                <h2 className="mb-6 text-base font-semibold text-foreground">
+                            <section className="mb-8">
+                                <h2 className="mb-4 text-base font-semibold text-foreground">
                                     本地账户
                                 </h2>
-                                <div className="rounded-2xl border border-border bg-card">
-                                    <div className="flex items-center gap-4 px-6 py-5">
-                                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-foreground text-background">
-                                            <UserCircle className="h-7 w-7" />
+                                <div className="rounded-lg border border-border bg-card">
+                                    <div className="flex items-center gap-3 px-4 py-4">
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                                                <UserRound className="h-5 w-5" />
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <div className="text-sm font-medium text-foreground">
@@ -412,20 +421,20 @@ export function ProfileSettingsDialog({
                                 </div>
                             </section>
 
-                            <section className="mb-12">
-                                <div className="mb-6 flex items-center justify-between">
+                            <section className="mb-8">
+                                <div className="mb-4 flex items-center justify-between">
                                     <h2 className="text-base font-semibold text-foreground">
                                         GitHub 图床信息
                                     </h2>
                                     {hasToken && (
-                                        <span className="flex items-center gap-1 text-sm text-emerald-600">
+                                        <span className="flex items-center gap-1 text-sm text-emerald-700 dark:text-emerald-400">
                                             <CheckCircle2 className="h-4 w-4" />
                                             已配置
                                         </span>
                                     )}
                                 </div>
 
-                                <div className="rounded-2xl border border-border bg-card px-6">
+                                <div className="rounded-lg border border-border bg-card px-4">
                                     {loading ? (
                                         <div className="py-10 text-sm text-muted-foreground">
                                             正在读取本地配置...
@@ -449,11 +458,11 @@ export function ProfileSettingsDialog({
                             </section>
 
                             <section>
-                                <h2 className="mb-6 text-base font-semibold text-foreground">
+                                <h2 className="mb-4 text-base font-semibold text-foreground">
                                     重要信息
                                 </h2>
-                                <div className="rounded-2xl border border-border bg-card">
-                                    <div className="flex items-start gap-4 border-b border-border px-6 py-5">
+                                <div className="rounded-lg border border-border bg-card">
+                                    <div className="flex items-start gap-3 border-b border-border px-4 py-4">
                                         <FolderGit2 className="mt-0.5 h-4 w-4 text-muted-foreground" />
                                         <div className="min-w-0 flex-1">
                                             <div className="text-sm font-medium text-foreground">
@@ -466,7 +475,7 @@ export function ProfileSettingsDialog({
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-start gap-4 px-6 py-5">
+                                    <div className="flex items-start gap-3 px-4 py-4">
                                         <KeyRound className="mt-0.5 h-4 w-4 text-muted-foreground" />
                                         <div className="min-w-0 flex-1">
                                             <div className="text-sm font-medium text-foreground">
@@ -480,11 +489,11 @@ export function ProfileSettingsDialog({
                                 </div>
                             </section>
                         </>
-                    ) : (
+                        ) : (
                         <>
-                            <div className="mb-12 flex items-center justify-between gap-4">
+                            <div className="mb-8 flex items-center justify-between gap-4">
                                 <div>
-                                    <h1 className="text-3xl font-semibold tracking-normal text-foreground">
+                                    <h1 className="text-2xl font-semibold tracking-normal text-foreground">
                                         GitHub 图床
                                     </h1>
                                     <p className="mt-3 text-sm text-muted-foreground">
@@ -493,22 +502,23 @@ export function ProfileSettingsDialog({
                                 </div>
                                 <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground">
                                     <StatusDot
-                                        className={getConnectionDotClass(
+                                        tone={getConnectionDotTone(
                                             config,
                                             connection,
                                             isTesting,
                                         )}
+                                        animated={isTesting}
                                     />
                                     {connectionLabel}
                                 </div>
                             </div>
 
-                            <section className="mb-10">
-                                <h2 className="mb-6 text-base font-semibold text-foreground">
+                            <section className="mb-8">
+                                <h2 className="mb-4 text-base font-semibold text-foreground">
                                     连接状态
                                 </h2>
-                                <div className="rounded-2xl border border-border bg-card px-6 py-5">
-                                    <div className="flex items-start justify-between gap-6">
+                                <div className="rounded-lg border border-border bg-card px-4 py-4">
+                                    <div className="flex items-start justify-between gap-4">
                                         <div className="min-w-0">
                                             <div className="text-sm font-medium text-foreground">
                                                 {connectionLabel}
@@ -534,8 +544,8 @@ export function ProfileSettingsDialog({
                                 </div>
                             </section>
 
-                            <section className="mb-10">
-                                <div className="mb-6 flex items-center justify-between">
+                            <section className="mb-8">
+                                <div className="mb-4 flex items-center justify-between">
                                     <h2 className="text-base font-semibold text-foreground">
                                         仓库配置
                                     </h2>
@@ -546,68 +556,76 @@ export function ProfileSettingsDialog({
                                     )}
                                 </div>
 
-                                <div className="rounded-2xl border border-border bg-card">
-                                    <Field label="Owner">
+                                <div className="rounded-xl border border-border bg-card p-4">
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                    <FormField label="Owner">
                                         <input
                                             value={config.owner}
                                             onChange={(event) =>
                                                 updateConfig({ owner: event.target.value })
                                             }
-                                            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                                            className={formControlClassName}
                                             placeholder="octocat"
                                         />
-                                    </Field>
-                                    <Field label="Repo">
+                                    </FormField>
+                                    <FormField label="Repo">
                                         <input
                                             value={config.repo}
                                             onChange={(event) =>
                                                 updateConfig({ repo: event.target.value })
                                             }
-                                            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                                            className={formControlClassName}
                                             placeholder="image-host"
                                         />
-                                    </Field>
-                                    <Field label="Branch">
+                                    </FormField>
+                                    <FormField label="Branch">
                                         <input
                                             value={config.branch}
                                             onChange={(event) =>
                                                 updateConfig({ branch: event.target.value })
                                             }
-                                            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                                            className={formControlClassName}
                                             placeholder="main"
                                         />
-                                    </Field>
-                                    <Field label="上传目录">
+                                    </FormField>
+                                    <FormField label="上传目录">
                                         <input
                                             value={config.directory}
                                             onChange={(event) =>
                                                 updateConfig({ directory: event.target.value })
                                             }
-                                            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                                            className={formControlClassName}
                                             placeholder="images"
                                         />
-                                    </Field>
-                                    <Field label="Token">
-                                        <input
-                                            type="text"
-                                            value={config.token}
-                                            onChange={(event) =>
-                                                updateConfig({ token: event.target.value })
-                                            }
-                                            className="h-9 w-full rounded-lg border border-input bg-background px-3 font-mono text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                                            placeholder="GitHub fine-grained token"
-                                        />
-                                    </Field>
+                                    </FormField>
+                                    <div className="md:col-span-2">
+                                        <FormField
+                                            label="Token"
+                                            description="Token 仅保存在本机缓存，用于 GitHub API 上传。"
+                                        >
+                                            <input
+                                                type="text"
+                                                value={config.token}
+                                                onChange={(event) =>
+                                                    updateConfig({ token: event.target.value })
+                                                }
+                                                className={cn(formControlClassName, 'font-mono text-xs')}
+                                                placeholder="GitHub fine-grained token"
+                                            />
+                                        </FormField>
+                                    </div>
+                                    </div>
                                 </div>
                             </section>
 
-                            <section className="mb-10">
-                                <h2 className="mb-6 text-base font-semibold text-foreground">
+                            <section className="mb-8">
+                                <h2 className="mb-4 text-base font-semibold text-foreground">
                                     CDN 链接
                                 </h2>
-                                <div className="rounded-2xl border border-border bg-card">
-                                    <Field label="链接前缀">
-                                        <div className="space-y-2">
+                                <div className="rounded-xl border border-border bg-card p-4">
+                                    <div className="grid gap-4">
+                                    <FormField label="链接前缀" description={cdnDescription}>
+                                        <div className="relative">
                                             <select
                                                 value={config.cdnProvider}
                                                 onChange={(event) =>
@@ -615,7 +633,7 @@ export function ProfileSettingsDialog({
                                                         cdnProvider: event.target.value as CdnProvider,
                                                     })
                                                 }
-                                                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                                                className={cn(formControlClassName, 'appearance-none pr-9')}
                                             >
                                                 {CDN_OPTIONS.map((option) => (
                                                     <option key={option.value} value={option.value}>
@@ -623,13 +641,11 @@ export function ProfileSettingsDialog({
                                                     </option>
                                                 ))}
                                             </select>
-                                            <p className="text-xs text-muted-foreground">
-                                                {cdnDescription}
-                                            </p>
+                                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                         </div>
-                                    </Field>
+                                    </FormField>
                                     {config.cdnProvider === 'custom' && (
-                                        <Field label="自定义 CDN">
+                                        <FormField label="自定义 CDN">
                                             <input
                                                 value={config.customCdnPrefix}
                                                 onChange={(event) =>
@@ -637,11 +653,12 @@ export function ProfileSettingsDialog({
                                                         customCdnPrefix: event.target.value,
                                                     })
                                                 }
-                                                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                                                className={formControlClassName}
                                                 placeholder="https://cdn.example.com"
                                             />
-                                        </Field>
+                                        </FormField>
                                     )}
+                                    </div>
                                 </div>
                             </section>
 
@@ -671,8 +688,9 @@ export function ProfileSettingsDialog({
                                 </button>
                             </div>
                         </>
-                    )}
-                </div>
+                        )}
+                    </div>
+                )}
             </main>
         </div>
     )

@@ -6,6 +6,7 @@ import { PageImageCompressor } from '@/components/page-image-compressor'
 import { PageGithubImageHost } from '@/components/page-github-image-host'
 import { ProfileSettingsDialog } from '@/components/profile-settings-dialog'
 import { cn } from '@/lib/utils'
+import { initializeTheme, useThemePreference } from '@/lib/theme'
 import './index.css'
 
 const PAGE_TITLES: Record<string, string> = {
@@ -14,6 +15,8 @@ const PAGE_TITLES: Record<string, string> = {
 }
 
 const App: React.FC = () => {
+  useThemePreference()
+
   const [activeId, setActiveId] = useState('imageCompressor')
   const [collapsed, setCollapsed] = useState(false)
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false)
@@ -94,4 +97,5 @@ if (!rootElement) {
   throw new Error('Root element #root was not found')
 }
 
+initializeTheme()
 createRoot(rootElement).render(<App />)

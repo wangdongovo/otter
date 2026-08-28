@@ -1,10 +1,10 @@
 import type React from 'react'
 import {
-    Cloud,
-    ImageDown,
+    GitBranch,
+    Image,
     PanelLeft,
-    Sparkles,
-    UserCircle,
+    Square,
+    UserRound,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -18,12 +18,12 @@ const NAV_ITEMS: NavItem[] = [
     {
         id: 'imageCompressor',
         label: '图片压缩',
-        icon: <ImageDown className="h-4 w-4" />,
+        icon: <Image className="h-4 w-4" />,
     },
     {
         id: 'githubImageHost',
         label: 'GitHub 图床',
-        icon: <Cloud className="h-4 w-4" />,
+        icon: <GitBranch className="h-4 w-4" />,
     },
 ]
 
@@ -66,8 +66,8 @@ export function SidebarNav({
                     onClick={() => onSelect('imageCompressor')}
                     className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
                 >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-md bg-foreground text-background">
-                        <Sparkles className="h-4 w-4" />
+                    <span className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-foreground">
+                        <Square className="h-3.5 w-3.5" />
                     </span>
                     <span className="flex-1 truncate text-left font-medium">Otter</span>
                 </button>
@@ -111,7 +111,7 @@ export function SidebarNav({
                     onClick={onProfileClick}
                     className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-sm text-sidebar-foreground/85 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 >
-                    <UserCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate text-left">个人工作台</span>
                 </button>
             </div>

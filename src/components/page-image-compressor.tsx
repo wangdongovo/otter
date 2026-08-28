@@ -1,10 +1,11 @@
 import { type ComponentProps, useEffect, useMemo, useState } from 'react'
 import {
     ClipboardPaste,
+    ChevronDown,
     FileImage,
     FolderOpen,
-    ImageDown,
     Images,
+    ImagePlus,
     Loader2,
     Play,
     RotateCcw,
@@ -12,6 +13,7 @@ import {
     Trash2,
     Upload,
 } from 'lucide-react'
+import { StatusDot, type StatusDotTone } from '@/components/status-dot'
 import { Button } from '@/components/ui/button'
 import type { SelectedImageFile } from '@/image-compressor-types'
 import { cn } from '@/lib/utils'
@@ -50,28 +52,17 @@ const STATUS_LABELS: Record<CompressStatus, string> = {
     failed: '失败',
 }
 
-const STATUS_DOT_CLASSES: Record<CompressStatus, string> = {
-    queued: 'bg-muted-foreground/45 ring-muted-foreground/15',
-    reading: 'bg-muted-foreground/45 ring-muted-foreground/15',
-    compressing: 'bg-emerald-500 ring-emerald-500/20',
-    saving: 'bg-emerald-500 ring-emerald-500/20',
-    completed: 'bg-emerald-500 ring-emerald-500/20',
-    failed: 'bg-destructive ring-destructive/20',
+const STATUS_DOT_TONES: Record<CompressStatus, StatusDotTone> = {
+    queued: 'neutral',
+    reading: 'info',
+    compressing: 'info',
+    saving: 'info',
+    completed: 'success',
+    failed: 'danger',
 }
 
 function StableButton({ className, ...props }: ComponentProps<typeof Button>) {
     return <Button className={cn('active:translate-y-0', className)} {...props} />
-}
-
-function StatusDot({ status }: { status: CompressStatus }) {
-    return (
-        <span
-            className={cn(
-                'h-2.5 w-2.5 shrink-0 rounded-full ring-4',
-                STATUS_DOT_CLASSES[status],
-            )}
-        />
-    )
 }
 
 const formatBytes = (bytes: number) => {
@@ -463,25 +454,23 @@ export function PageImageCompressor() {
     }
 
     return (
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-8 pb-10 pt-10">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-8 pb-8 pt-8">
             <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-muted">
-                        <ImageDown className="h-6 w-6 text-muted-foreground" />
-                    </div>
+                <div className="flex items-start gap-2.5">
+                    <ImagePlus className="mt-1 h-5 w-5 text-muted-foreground" />
                     <div>
-                        <h1 className="text-2xl font-bold text-foreground">图片压缩</h1>
-                        <p className="text-sm text-muted-foreground">
+                        <h1 className="text-xl font-semibold text-foreground">图片压缩</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">
                             批量压缩图片，转换格式，并保存到指定本地文件夹。
                         </p>
                     </div>
                 </div>
             </div>
 
-            <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border bg-muted/30 p-6">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-background">
-                        <Images className="h-7 w-7 text-muted-foreground" />
+            <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/20 p-6">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-border bg-background">
+                        <Images className="h-6 w-6 text-muted-foreground" />
                     </div>
                     <div className="text-center">
                         <p className="text-sm font-medium text-foreground">批量选择图片</p>
@@ -489,7 +478,7 @@ export function PageImageCompressor() {
                             支持 JPG、PNG、WebP、GIF、BMP，已选择 {items.length} 张。
                         </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap justify-center gap-2">
                         <StableButton onClick={handleSelectImages} disabled={isProcessing}>
                             <Upload className="h-4 w-4" />
                             选择图片
@@ -514,7 +503,7 @@ export function PageImageCompressor() {
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
+                <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-foreground">输出设置</span>
                         <span className="text-xs text-muted-foreground">{currentFormat.label}</span>
@@ -522,18 +511,21 @@ export function PageImageCompressor() {
 
                     <label className="flex flex-col gap-2 text-sm">
                         <span className="text-muted-foreground">图片格式</span>
-                        <select
-                            value={format}
-                            onChange={(event) => setFormat(event.target.value as OutputFormat)}
-                            disabled={isProcessing}
-                            className="h-8 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                        >
-                            {OUTPUT_FORMATS.map((item) => (
-                                <option key={item.value} value={item.value}>
-                                    {item.label}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="relative">
+                            <select
+                                value={format}
+                                onChange={(event) => setFormat(event.target.value as OutputFormat)}
+                                disabled={isProcessing}
+                                className="h-9 w-full appearance-none rounded-lg border border-input bg-background px-3 pr-9 text-sm text-foreground outline-none transition-colors focus-visible:border-ring/60 focus-visible:ring-1 focus-visible:ring-ring/25 disabled:opacity-50"
+                            >
+                                {OUTPUT_FORMATS.map((item) => (
+                                    <option key={item.value} value={item.value}>
+                                        {item.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        </div>
                     </label>
 
                     <label className="flex flex-col gap-2 text-sm">
@@ -564,7 +556,7 @@ export function PageImageCompressor() {
                             onChange={(event) => setPrefix(event.target.value)}
                             disabled={isProcessing}
                             placeholder="compressed-"
-                            className="h-8 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                            className="h-8 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring/60 focus-visible:ring-1 focus-visible:ring-ring/25"
                         />
                     </label>
 
@@ -575,7 +567,7 @@ export function PageImageCompressor() {
                             onChange={(event) => setPattern(event.target.value)}
                             disabled={isProcessing}
                             placeholder="{prefix}{name}-{timestamp}"
-                            className="h-8 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                            className="h-8 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring/60 focus-visible:ring-1 focus-visible:ring-ring/25"
                         />
                         <span className="text-xs text-muted-foreground">
                             可用：{'{name}'}、{'{prefix}'}、{'{timestamp}'}、{'{index}'}
@@ -643,7 +635,7 @@ export function PageImageCompressor() {
                     items.map((item) => (
                         <div
                             key={item.id}
-                            className="grid min-h-24 gap-3 rounded-lg border border-border bg-card p-4 md:grid-cols-[minmax(0,1fr)_130px_120px_76px]"
+                            className="grid min-h-20 gap-3 rounded-lg border border-border bg-card p-3 md:grid-cols-[minmax(0,1fr)_130px_120px_76px]"
                         >
                             <div className="flex min-w-0 items-center gap-3">
                                 <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
@@ -671,7 +663,14 @@ export function PageImageCompressor() {
                             </div>
 
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <StatusDot status={item.status} />
+                                <StatusDot
+                                    tone={STATUS_DOT_TONES[item.status]}
+                                    animated={
+                                        item.status === 'reading' ||
+                                        item.status === 'compressing' ||
+                                        item.status === 'saving'
+                                    }
+                                />
                                 <span className="tabular-nums">{getStatusText(item)}</span>
                             </div>
 

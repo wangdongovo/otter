@@ -1,17 +1,17 @@
 import { type ComponentProps, useEffect, useState } from 'react'
 import {
     Check,
-    Cloud,
-    CloudUpload,
     Copy,
     GitBranch,
     Image as ImageIcon,
+    ImageUp,
     Link,
     Loader2,
-    Settings,
+    SlidersHorizontal,
     Trash2,
     Upload,
 } from 'lucide-react'
+import { StatusDot, type StatusDotTone } from '@/components/status-dot'
 import { Button } from '@/components/ui/button'
 import type { SelectedImageFile } from '@/image-compressor-types'
 import type {
@@ -77,48 +77,24 @@ const formatBytes = (bytes: number) => {
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`
 }
 
-const getStatusDotClass = (status: UploadStatus) => {
-    if (status === 'completed') return 'bg-emerald-300 shadow-[0_0_12px_rgb(110_231_183_/_0.95)]'
-    if (status === 'failed') return 'bg-rose-300 shadow-[0_0_12px_rgb(253_164_175_/_0.95)]'
-    if (status === 'uploading') return 'bg-cyan-300 shadow-[0_0_12px_rgb(103_232_249_/_0.95)]'
+const getStatusDotTone = (status: UploadStatus): StatusDotTone => {
+    if (status === 'completed') return 'success'
+    if (status === 'failed') return 'danger'
+    if (status === 'uploading') return 'info'
 
-    return 'bg-zinc-300 shadow-[0_0_8px_rgb(212_212_216_/_0.75)]'
+    return 'neutral'
 }
 
-const getConnectionDotClass = (
+const getConnectionDotTone = (
     connection: GithubImageHostConnection | null,
     isChecking: boolean,
     isConfigured: boolean,
-) => {
-    if (!isConfigured) return 'bg-zinc-300 shadow-[0_0_8px_rgb(212_212_216_/_0.75)]'
-    if (isChecking) return 'bg-cyan-300 shadow-[0_0_12px_rgb(103_232_249_/_0.95)]'
-    if (!connection) return 'bg-zinc-300 shadow-[0_0_8px_rgb(212_212_216_/_0.75)]'
+): StatusDotTone => {
+    if (!isConfigured) return 'neutral'
+    if (isChecking) return 'info'
+    if (!connection) return 'neutral'
 
-    return connection.ok
-        ? 'bg-emerald-300 shadow-[0_0_12px_rgb(110_231_183_/_0.95)]'
-        : 'bg-rose-300 shadow-[0_0_12px_rgb(253_164_175_/_0.95)]'
-}
-
-function StatusDot({
-    className,
-    animated = true,
-}: {
-    className: string
-    animated?: boolean
-}) {
-    return (
-        <span className="relative flex h-1.5 w-1.5 shrink-0 items-center justify-center">
-            {animated && (
-                <span
-                    className={cn(
-                        'absolute h-1.5 w-1.5 rounded-full opacity-45 animate-ping',
-                        className,
-                    )}
-                />
-            )}
-            <span className={cn('relative h-1.5 w-1.5 rounded-full', className)} />
-        </span>
-    )
+    return connection.ok ? 'success' : 'danger'
 }
 
 function StableButton({
@@ -195,7 +171,9 @@ export function PageGithubImageHost({ onOpenGithubSettings }: PageGithubImageHos
         const loadPreviews = async () => {
             const entries = await Promise.all(
                 records.map(async (record) => {
-                    const previewUrl = await window.githubImageHost.getRecordPreview(record.id)
+                    const previewUrl = await window.githubImageHost
+                        .getRecordPreview(record.id)
+                        .catch((): null => null)
 
                     return [record.id, previewUrl] as const
                 }),
@@ -396,24 +374,23 @@ export function PageGithubImageHost({ onOpenGithubSettings }: PageGithubImageHos
         CDN_OPTIONS.find((option) => option.value === form.cdnProvider)?.label ?? 'jsDelivr'
     const isConnectionConfigured = canTestConnection(form)
     return (
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-8 pb-10 pt-10">
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-muted">
-                        <Cloud className="h-6 w-6 text-muted-foreground" />
-                    </div>
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-8 pb-8 pt-8">
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-2.5">
+                    <GitBranch className="mt-1 h-5 w-5 text-muted-foreground" />
                     <div>
-                        <h1 className="text-2xl font-bold text-foreground">GitHub 图床</h1>
-                        <p className="text-sm text-muted-foreground">上传图片，生成 CDN 链接。</p>
+                        <h1 className="text-xl font-semibold text-foreground">GitHub 图床</h1>
+                        <p className="mt-1 text-sm text-muted-foreground">上传图片，生成 CDN 链接。</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
                     <StatusDot
-                        className={getConnectionDotClass(
+                        tone={getConnectionDotTone(
                             connection,
                             isTesting,
                             isConnectionConfigured,
                         )}
+                        animated={isTesting}
                     />
                     <StableButton
                         variant="ghost"
@@ -421,12 +398,12 @@ export function PageGithubImageHost({ onOpenGithubSettings }: PageGithubImageHos
                         onClick={onOpenGithubSettings}
                         title="GitHub 配置"
                     >
-                        <Settings className="h-4 w-4" />
+                        <SlidersHorizontal className="h-4 w-4" />
                     </StableButton>
                 </div>
             </div>
 
-            <section className="flex flex-col gap-4">
+            <section className="flex flex-col gap-3">
                 <div className="grid gap-3 rounded-lg border border-border bg-card p-3 md:grid-cols-4">
                     <div className="flex items-center gap-2">
                         <GitBranch className="h-4 w-4 text-muted-foreground" />
@@ -457,7 +434,7 @@ export function PageGithubImageHost({ onOpenGithubSettings }: PageGithubImageHos
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4">
+                <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                             <Upload className="h-4 w-4 text-muted-foreground" />
@@ -484,16 +461,13 @@ export function PageGithubImageHost({ onOpenGithubSettings }: PageGithubImageHos
                             }
                         }}
                         className={cn(
-                            'group relative flex min-h-56 cursor-pointer items-center justify-center rounded-2xl border border-dashed border-border bg-muted/15 p-8 transition-colors hover:border-foreground/25 hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+                            'group relative flex min-h-48 cursor-pointer items-center justify-center rounded-lg border border-dashed border-border bg-muted/15 p-8 transition-colors hover:border-foreground/25 hover:bg-muted/35 focus-visible:outline-none focus-visible:border-ring/60 focus-visible:ring-1 focus-visible:ring-ring/25',
                             isUploading && 'pointer-events-none cursor-default opacity-60',
                         )}
                         title="选择图片"
                     >
-                        <div className="relative flex h-28 w-28 items-center justify-center">
-                            <span className="absolute h-20 w-20 rounded-full bg-cyan-300/10 opacity-0 transition-opacity group-hover:opacity-100 group-hover:animate-ping" />
-                            <span className="absolute h-24 w-24 rounded-full border border-border/80 bg-background shadow-sm transition-transform duration-300 group-hover:scale-105" />
-                            <CloudUpload className="relative h-11 w-11 text-muted-foreground transition-colors duration-200 group-hover:text-foreground" />
-                            <span className="absolute bottom-5 h-1.5 w-6 rounded-full bg-cyan-300/80 shadow-[0_0_14px_rgb(103_232_249_/_0.8)] transition-transform duration-300 group-hover:-translate-y-8 group-hover:opacity-0" />
+                        <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-border bg-background transition-colors group-hover:bg-accent">
+                            <ImageUp className="h-6 w-6 text-muted-foreground transition-colors group-hover:text-foreground" />
                         </div>
                     </div>
 
@@ -501,7 +475,7 @@ export function PageGithubImageHost({ onOpenGithubSettings }: PageGithubImageHos
                         <div
                             className={cn(
                                 'rounded-lg px-3 py-2 text-sm',
-                                noticeTone === 'success' && 'bg-green-500/10 text-green-600',
+                                noticeTone === 'success' && 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
                                 noticeTone === 'error' && 'bg-destructive/10 text-destructive',
                                 noticeTone === 'neutral' && 'bg-muted text-muted-foreground',
                             )}
@@ -519,7 +493,7 @@ export function PageGithubImageHost({ onOpenGithubSettings }: PageGithubImageHos
                             items.map((item) => (
                                 <div
                                     key={item.id}
-                                    className="grid gap-3 rounded-lg border border-border p-3 md:grid-cols-[minmax(0,1fr)_32px_88px]"
+                            className="grid gap-3 rounded-lg border border-border bg-background/40 p-3 md:grid-cols-[minmax(0,1fr)_32px_88px]"
                                 >
                                     <div className="flex min-w-0 items-center gap-3">
                                         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
@@ -548,7 +522,8 @@ export function PageGithubImageHost({ onOpenGithubSettings }: PageGithubImageHos
                                     </div>
                                     <div className="flex items-center justify-center">
                                         <StatusDot
-                                            className={getStatusDotClass(item.status)}
+                                            tone={getStatusDotTone(item.status)}
+                                            animated={item.status === 'uploading'}
                                         />
                                     </div>
                                     <div className="flex items-center justify-end gap-1">
@@ -562,7 +537,7 @@ export function PageGithubImageHost({ onOpenGithubSettings }: PageGithubImageHos
                                             {item.status === 'uploading' ? (
                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                             ) : (
-                                                <Cloud className="h-4 w-4" />
+                                                <Upload className="h-4 w-4" />
                                             )}
                                         </StableButton>
                                         <StableButton
